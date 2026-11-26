@@ -107,6 +107,18 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — `logic::merge` (the merge/containment/expand loop behind `Sop::minimize` and
+  `Sop::complement`) rewritten to give *exactly* the old result faster: the first mergeable pair
+  of the sorted cover is found by looking up distance-1 neighbours in a sorted set, resuming
+  from a frontier (only partners of the new cube can pair below it), and once the cover is
+  containment-free only the new cube is checked. The old algorithm stays as `merge_general` (the
+  fallback for cubes with bits outside their care set, and the test reference:
+  `merge_equals_the_plain_algorithm`, 460 random covers and their complements, identical).
+  Why: the mapping–placement edge sweep's 12-bit registered compare timed out (> 180 s): its
+  complements reach 20,590 raw cubes (the Shannon complement does not merge halves) and the
+  old merge was ~n³. Now: gate mapping 15 → 9.2 s, word mapping 139 → 95 s (single thread
+  82 s: the vendor-style collapse of `lt` takes 36 s, open). Checks: vendor identity unchanged
+  (2017 / 4025 / 6155), corpus and examples byte-identical, workspace tests 47/47.
 * **2026-11-26** — **Bug fixed** (found by the mapping–placement edge sweep,
   `.scratch/mploop/edge.py`): a registered 6-bit compare panicked on the ATF1502AS
   (`write_pt`, "no entry found for key"). A macrocell holding a cell *and* the cascade helper of

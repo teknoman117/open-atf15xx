@@ -360,8 +360,156 @@ fn complement(c: &[Cube], n: usize) -> Vec<Cube> {
     out
 }
 
-/// Repeatedly merge distance-1 cubes and drop contained cubes.
-fn merge(mut c: Vec<Cube>) -> Vec<Cube> {
+/// Repeatedly merge distance-1 cubes and drop contained cubes; expand when nothing else changes.
+///
+/// The result is exactly that of the plain algorithm ([`merge_general`], also the reference in
+/// the tests): each
+/// pass merges the *first* mergeable pair of the sorted cover (smallest cube, then its smallest
+/// partner), then drops every cube contained in another, and only a pass that changes nothing
+/// expands literals. The plain version searched all pairs and all containments after every merge
+/// (about n³ for n cubes: minutes on a 12-bit comparator's covers); here the first pair is found
+/// by looking up each cube's distance-1 neighbours in the sorted set, and once the cover is
+/// containment-free only the new cube is checked against the others.
+fn merge(c: Vec<Cube>) -> Vec<Cube> {
+    // the lookups need cubes without stray bits outside their care set
+    if c.iter().any(|x| x.val & !x.care != 0) {
+        return merge_general(c);
+    }
+    let mut set: std::collections::BTreeSet<Cube> = c.into_iter().collect();
+    // is the cover containment-free?
+    let mut clean = false;
+    let drop_contained = |set: &mut std::collections::BTreeSet<Cube>| -> bool {
+        let snap: Vec<Cube> = set.iter().copied().collect();
+        let before = set.len();
+        set.retain(|x| !snap.iter().any(|y| y != x && y.contains(x)));
+        set.len() != before
+    };
+    // a cube's smallest partner above it: same care set, one more literal positive
+    let partner_above = |set: &std::collections::BTreeSet<Cube>, x: &Cube| -> Option<Cube> {
+        let mut best: Option<u64> = None;
+        let mut bits = x.care & !x.val;
+        while bits != 0 {
+            let b = bits & bits.wrapping_neg();
+            bits &= bits - 1;
+            let v = x.val | b;
+            if best.map_or(true, |w| v < w) && set.contains(&Cube { care: x.care, val: v }) {
+                best = Some(v);
+            }
+        }
+        best.map(|v| Cube { care: x.care, val: v })
+    };
+    // the search state between merges: no cube below `frontier` has a partner above it, except
+    // possibly those in `dirty` (partners of cubes created since, and created cubes below it)
+    let mut frontier: Option<Cube> = None;
+    let mut dirty: std::collections::BTreeSet<Cube> = std::collections::BTreeSet::new();
+    loop {
+        let mut changed = false;
+        // the first cube (sorted order) with a partner of the same care set differing in one
+        // literal, and its smallest such partner (a partner is larger: a smaller one would have
+        // been found first)
+        let mut from_dirty = None;
+        for y in dirty.clone() {
+            dirty.remove(&y);
+            if !set.contains(&y) {
+                continue;
+            }
+            if let Some(p) = partner_above(&set, &y) {
+                from_dirty = Some((y, p));
+                dirty.insert(y);
+                break;
+            }
+        }
+        let scan_start = frontier.unwrap_or(Cube { care: 0, val: 0 });
+        let limit = from_dirty.map(|(y, _)| y);
+        let mut from_scan = None;
+        for x in set.range(scan_start..) {
+            if limit.is_some_and(|l| *x >= l) {
+                break;
+            }
+            if let Some(p) = partner_above(&set, x) {
+                from_scan = Some((*x, p));
+                break;
+            }
+            frontier = Some(*x);
+        }
+        let pair = match (from_dirty, from_scan) {
+            (Some(a), Some(b)) => Some(if b.0 < a.0 { b } else { a }),
+            (a, b) => a.or(b),
+        };
+        if let Some((a, b)) = pair {
+            if frontier.map_or(true, |f| a > f) {
+                frontier = Some(a);
+            }
+            dirty.remove(&a);
+            let d = (a.val ^ b.val) & a.care;
+            let m = Cube { care: a.care & !d, val: a.val & !d };
+            set.remove(&a);
+            set.remove(&b);
+            set.insert(m);
+            // the new cube and its partners below the frontier may now pair
+            let below = |x: &Cube, f: &Option<Cube>| f.is_some_and(|f| *x < f);
+            if below(&m, &frontier) {
+                dirty.insert(m);
+            }
+            let mut bits = m.care;
+            while bits != 0 {
+                let bit = bits & bits.wrapping_neg();
+                bits &= bits - 1;
+                let n = Cube { care: m.care, val: m.val ^ bit };
+                if below(&n, &frontier) && set.contains(&n) {
+                    dirty.insert(n);
+                }
+            }
+            changed = true;
+            if clean {
+                // only the new cube can contain others or be contained
+                let victims: Vec<Cube> = set.iter().filter(|x| **x != m && m.contains(x)).copied().collect();
+                let covered = set.iter().any(|y| *y != m && y.contains(&m));
+                for v in victims {
+                    set.remove(&v);
+                }
+                if covered {
+                    set.remove(&m);
+                }
+            } else {
+                drop_contained(&mut set);
+                clean = true;
+            }
+        } else if !clean {
+            changed = drop_contained(&mut set);
+            clean = true;
+        }
+        if !changed {
+            // expand: drop literals while the cube stays inside the function
+            let mut c: Vec<Cube> = set.iter().copied().collect();
+            let f = c.clone();
+            for k in 0..c.len() {
+                for i in 0..64 {
+                    let b = 1u64 << i;
+                    if c[k].care & b == 0 {
+                        continue;
+                    }
+                    let e = Cube { care: c[k].care & !b, val: c[k].val & !b };
+                    if cube_in_cover(&e, &f) {
+                        c[k] = e;
+                        changed = true;
+                    }
+                }
+            }
+            if !changed {
+                return c;
+            }
+            set = c.into_iter().collect();
+            clean = false;
+            frontier = None;
+            dirty.clear();
+        }
+    }
+}
+
+/// The plain algorithm: [`merge`] for covers with bits outside a cube's care set (which this
+/// module does not produce), and the reference [`merge`] is tested against.
+fn merge_general(mut c: Vec<Cube>) -> Vec<Cube> {
     loop {
         c.sort();
         c.dedup();
@@ -445,6 +593,32 @@ mod tests {
     use super::*;
     fn s(n: &str) -> Signal {
         Signal::Pad(n.into())
+    }
+
+    /// The fast `merge` gives exactly the plain algorithm's cover (same cubes, same order) on
+    /// random covers and their complements (the two inputs `Sop::minimize` and
+    /// `Sop::complement` give it).
+    #[test]
+    fn merge_equals_the_plain_algorithm() {
+        use rand::{Rng, SeedableRng};
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
+        for round in 0..460 {
+            // mostly small covers; the last 60 rounds wide ones (complements of thousands of cubes)
+            let (n, cubes) = if round < 400 {
+                (rng.random_range(2..=9usize), rng.random_range(1..=24usize))
+            } else {
+                (rng.random_range(10..=12usize), rng.random_range(8..=40usize))
+            };
+            let cover: Vec<Cube> = (0..cubes)
+                .map(|_| {
+                    let care: u64 = rng.random::<u64>() & ((1u64 << n) - 1);
+                    Cube { care, val: rng.random::<u64>() & care }
+                })
+                .collect();
+            for c in [cover.clone(), complement(&cover, n)] {
+                assert_eq!(merge(c.clone()), merge_general(c.clone()), "round {round}: {c:?}");
+            }
+        }
     }
     #[test]
     fn complement_of_or_is_one_product() {
