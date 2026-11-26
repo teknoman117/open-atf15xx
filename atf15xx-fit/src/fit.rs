@@ -355,6 +355,23 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
     let mut last = None;
     let mut avoid: BTreeSet<(String, u16)> = BTreeSet::new();
     let mut repairs = 0;
+    // repair progress (ATF_FIT_REPAIR_LOG=FILE records it per fit): the fewest distinct inputs a
+    // failing block needed so far, and the longest run of repairs without improving on it
+    let (mut best_need, mut stale, mut max_stale) = (usize::MAX, 0usize, 0usize);
+    let t_fit = std::time::Instant::now();
+    let log_repairs = |ok: bool, repairs: usize, max_stale: usize| {
+        if let Some(path) = std::env::var_os("ATF_FIT_REPAIR_LOG") {
+            use std::io::Write;
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                let _ = writeln!(
+                    f,
+                    "{} repairs={repairs} max_stale={max_stale} s={:.2}",
+                    if ok { "ok" } else { "fail" },
+                    t_fit.elapsed().as_secs_f64()
+                );
+            }
+        }
+    };
     for _split_round in 0..200 {
         let mut cascade_victim = None;
         let mut retry = false;
@@ -387,8 +404,25 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
                 );
             }
             match attempt {
-                Ok(r) => return Ok(r),
+                Ok(r) => {
+                    log_repairs(true, repairs, max_stale);
+                    return Ok(r);
+                }
                 Err(e) if e.kind() == FitErrorKind::Routing && e.msg.contains("[movable: ") && repairs < 96 => {
+                    let need = e
+                        .msg
+                        .split(" (")
+                        .nth(1)
+                        .and_then(|x| x.split(' ').next())
+                        .and_then(|x| x.parse::<usize>().ok())
+                        .unwrap_or(usize::MAX);
+                    if need < best_need {
+                        best_need = need;
+                        stale = 0;
+                    } else {
+                        stale += 1;
+                        max_stale = max_stale.max(stale);
+                    }
                     // move one floating node out of the congested block and try again
                     let blk = e.msg.split("block ").nth(1).and_then(|x| x.chars().next()).unwrap();
                     let b = (blk as u8 - b'A') as u16;
@@ -431,6 +465,7 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
             None => break,
         }
     }
+    log_repairs(false, repairs, max_stale);
     Err(last.unwrap())
 }
 

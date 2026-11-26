@@ -86,6 +86,38 @@ matching constraint (the row with no analogue in section 1) is checked only afte
    the matching constraints and run, time-bounded, as a last strategy for designs the heuristics
    fail on, which would also prove infeasibility where it holds.
 
+## 5. Results (2026-11-26, measured)
+
+Both recommendations were tried against data before keeping anything.
+
+* **Repair loop statistics** (`ATF_FIT_REPAIR_LOG=FILE`, kept in `fit_design`): none of the
+  12,624 vendor-corpus fits and none of the 134 corpus/example fits need a single repair. In the
+  75 hardest edge-sweep builds, 7 fits succeed only after repairs, one after 38 repairs without
+  any improvement of the failing block's input count. A "stop when stuck" rule would lose fits, so
+  the loop stays.
+* **UIM matching in the partitioner** (recommendation 1): implemented as a second, lexicographic
+  search (blocks over the limit, then unmatched sources with an optimistic per-block mux mask for
+  floating feedback, then the balance terms), run only when the first search leaves unmatched
+  sources. It never runs on the corpus. A/B on 150 hard fits: the same 103 fits, identical
+  macrocell counts, time within noise (2,997 vs 3,028 s). **Not kept.**
+* **Replication opportunity** (recommendation 2), measured at every UIM routing failure of the
+  hard builds: 10,403 failures had a block over 40 inputs, 73 % of them over by ten or more; in
+  only 312 (3 %) could copies of other blocks' buried nodes (whose inputs the block already reads)
+  cover the excess. 1,252 failures were matching failures within 40. **Not implemented**: the
+  failures are cells that need too many inputs, a mapping problem (fewer, narrower cells: the
+  coarse-level mapping item, F9.3), not a placement one.
+
+## 6. Skipping the `.tt2` stage (the user's question)
+
+The open flow has no `.tt2` stage to skip: `atf15xx-synth` imports Yosys's netlist straight into
+the fitter's in-memory design (`yosys::import_netlist` → `netlist::Design` → `fit_design`) and
+writes the JED from it; a `.tt2` is written only with `--emit-tt2`, for the vendor fitter. What
+the in-memory design shares with a `.tt2` is the two-level (sum-of-products) model, and that is
+where the measured costs were (complements and minimisation of XOR-rich logic, F9.11 and the
+2026-11-26 log entries). Keeping word structure longer (BDD toggle recovery and word-level
+mapping already do, F9.8/F9.9; coarse-level mapping would go further) is the "direct" path
+with a performance case.
+
 Sources: [UCSD FPGA partitioning](https://vlsicad.ucsd.edu/Publications/Conferences/40/c40.pdf),
 [Krupnova & Saucier, DATE 99](https://past.date-conference.com/proceedings-archive/1999/DATE99/pdffiles/09b_3.pdf),
 [US 5675500 (multi-chip partitioning)](https://patents.google.com/patent/US5675500A/en),

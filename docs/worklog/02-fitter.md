@@ -107,6 +107,17 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — Partitioning recommendations tested (`docs/plan/partitioning.md` §5), both
+  negative: (1) a UIM-matching-aware second partition search (lexicographic: over-limit blocks,
+  then unmatched sources with an optimistic per-block mux mask, then balance) never ran on the
+  corpus and, on 150 hard edge-sweep fits, changed nothing (103 = 103 fits, identical macrocell
+  counts, time within noise): removed. (2) Replication: at 10,403 over-40 routing failures, copies
+  of other blocks' buried nodes could cover the excess in 3 %; 73 % were 10+ inputs over: not
+  implemented. Kept: `ATF_FIT_REPAIR_LOG=FILE` (one line per `fit_design`: repairs, longest run
+  without improvement, time). It showed that no vendor-corpus (12,624) or corpus/example (134) fit
+  needs a repair, while 7 hard fits succeed only after repairs (one after a 38-repair plateau), so
+  the repair loop is not cut. The remaining hard failures are cells needing too many inputs, a
+  mapping question (coarse-level mapping, F9.3), not placement.
 * **2026-11-26** — Clone pass (user: "ensure we're not widely using borrow checker appeasement in
   ways that slows our execution"), batch 1, by profile (SELFPROGRAMBOARD, frame-pointer build):
   `Sop::signals` / `Cell::inputs` cloned every literal's `Signal` (a heap `String`) before
