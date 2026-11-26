@@ -1353,6 +1353,25 @@ fn fit_attempt(
                 }
             }
         }
+        // a macrocell holding a cell *and* the cascade helper of its neighbour also carries the
+        // helper's PTs (the writer puts them there): their inputs need routing too. Added last,
+        // so a block whose other PTs already read them keeps its order (and its fuses).
+        for m in (b * 16 + 1)..=(b * 16 + 16) {
+            let u = &uses[m];
+            let (Some(_), Some(t)) = (u.cell, u.helper_for) else { continue };
+            let Some(i) = uses[t as usize].cell else { continue };
+            for p in plans[i].helper_pts.values() {
+                for (s, _) in p {
+                    if matches!(s, Signal::Fold(_)) {
+                        continue;
+                    }
+                    let src = source_of(s)?;
+                    if !need.iter().any(|x| x.0 == src) {
+                        need.push((src, s.to_string()));
+                    }
+                }
+            }
+        }
         if std::env::var_os("ATF_FIT_DEBUG").is_some() {
             let mut who: Vec<String> = vec![];
             for m in (b * 16 + 1)..=(b * 16 + 16) {
@@ -2264,12 +2283,16 @@ fn write_pt(
             if !pos {
                 return err(FitErrorKind::Other, format!("internal: inverted foldback literal {k} in a product term"));
             }
-            let m = FOLD_MC.with(|x| x.borrow()[&(k.clone(), b)]);
+            let Some(m) = FOLD_MC.with(|x| x.borrow().get(&(k.clone(), b)).copied()) else {
+                return err(FitErrorKind::Other, format!("internal: MC{mc} reads foldback {k}, which has no expander in block {}", atf15xx_arch::block_letter(b)));
+            };
             fz.set(a + f.pt_foldback_column((m as usize - 1) % 16), false);
             continue;
         }
         let src = source_of(s)?;
-        let mux = col_of[&(b, src)];
+        let Some(&mux) = col_of.get(&(b, src)) else {
+            return err(FitErrorKind::Other, format!("internal: PT{k} of MC{mc} reads {s}, which is not routed into block {}", atf15xx_arch::block_letter(b)));
+        };
         fz.set(a + f.pt_input_column(mux, !pos), false);
     }
     Ok(())

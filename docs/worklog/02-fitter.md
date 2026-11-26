@@ -107,6 +107,18 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — **Bug fixed** (found by the mapping–placement edge sweep,
+  `.scratch/mploop/edge.py`): a registered 6-bit compare panicked on the ATF1502AS
+  (`write_pt`, "no entry found for key"). A macrocell holding a cell *and* the cascade helper of
+  its neighbour gets the helper's PTs written into it, but the block's UIM `need` list only took
+  the cell's own PTs, so the helper's inputs were routed only when another PT happened to need
+  them. Fix: those helper PTs' inputs are added to the list (after the others, so blocks that
+  already routed them keep their order). The two map lookups in `write_pt` now return internal
+  errors (the flow then tries the next strategy) instead of panicking. Regression design
+  `atf15xx-synth/tests/designs/cmpreg.v`: 19 MCs on all three parts, PROVEN (52.6 MHz on the
+  1502 by strategy 0; before, the first strategies panicked). Checks: vendor identity unchanged
+  (2017 / 4025 / 6155, `verify_tt2.py` on feat + ptcol2 + pinroles), corpus and examples
+  byte-identical, workspace tests 46/46.
 * **2026-11-26** — Typed fit errors (F9.9 item 1, prerequisite of the mapping–placement loop):
   `FitError` carries a `FitErrorKind` set at each of the 28 raise sites instead of being
   classified from its text afterwards; "no free input pin" is its own kind `InputPins` (counted as
