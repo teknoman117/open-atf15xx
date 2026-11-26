@@ -39,6 +39,9 @@ pub fn data_limit(c: &Cell, max_products: usize) -> usize {
 /// Split data covers that exceed [`data_limit`] into buried OR nodes (`<cell>_s<k>`, at most
 /// `limit` products each) so that every cell fits a macrocell plus one cascade neighbour.
 /// Returns the number of nodes created.
+/// Intermediate cubes [`split_large`] spends on finding out whether the complement is cheaper.
+const SPLIT_COMPLEMENT_CUBES: usize = 1 << 14;
+
 pub fn split_large(d: &mut Design, max_products: usize) -> usize {
     let mut created = 0;
     let mut i = 0;
@@ -46,10 +49,11 @@ pub fn split_large(d: &mut Design, max_products: usize) -> usize {
         let limit = data_limit(&d.cells[i], max_products);
         let c = &d.cells[i];
         if cost(&c.data) > limit {
-            // work in the cheaper polarity
-            let comp = c.data.complement();
-            let (mut data, flip) =
-                if comp.0.len() < c.data.0.len() { (comp, true) } else { (c.data.minimize(), false) };
+            // work in the cheaper polarity (a complement too large to compute is not cheaper)
+            let (mut data, flip) = match c.data.complement_within(SPLIT_COMPLEMENT_CUBES) {
+                Some(comp) if comp.0.len() < c.data.0.len() => (comp, true),
+                _ => (c.data.minimize(), false),
+            };
             let base = c.name.clone();
             let mut nodes = vec![];
             let node_limit = data_limit(&Cell { ce: None, ar: None, ap: None, oe: None, clk: None, ..c.clone() }, max_products);

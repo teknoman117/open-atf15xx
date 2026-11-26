@@ -303,6 +303,9 @@ pub fn fit(family: Family, pla: &Pla, opts: &Options) -> Result<FitResult, FitEr
 /// Distinct UIM inputs a block can route to its product terms (all families).
 pub const UIM_INPUTS_PER_BLOCK: usize = 40;
 
+/// Product terms one cell can use: its own 5 and those of up to 15 cascade helpers in its block.
+pub const MAX_CHAIN_PTS: usize = 16 * 5;
+
 /// Cells whose product terms would need more signals than a block's UIM delivers can never fit:
 /// report them instead of trying (and instead of complementing huge functions).
 pub fn check_support(design: &Design) -> Result<(), FitError> {
@@ -539,6 +542,14 @@ fn fit_attempt(
     }
     // product-term demand per cell (estimate), and cascade helper reservations below pinned cells
     let demand: Vec<usize> = design.cells.iter().map(|c| pt_demand(c, design.xor.get(&c.name))).collect();
+    // a cell borrows cascade helpers only within its block (at most 15 neighbours, 5 PTs each):
+    // placement uses the same estimate, so a larger demand can never be placed (spec F4.3)
+    if let Some((i, &n)) = demand.iter().enumerate().max_by_key(|(_, &n)| n).filter(|(_, &n)| n > MAX_CHAIN_PTS) {
+        return err(
+            FitErrorKind::Capacity,
+            format!("{}: needs {n} product terms, more than a cascade chain in one block holds ({MAX_CHAIN_PTS})", design.cells[i].name),
+        );
+    }
     let mut reserved_mcs: BTreeSet<u16> = BTreeSet::new();
     for (i, c) in design.cells.iter().enumerate() {
         if demand[i] > 5 {
@@ -1592,6 +1603,34 @@ fn fit_attempt(
     Ok(FitResult { device: dev, fuses: fz, placement, routing, design })
 }
 
+/// Products left after foldback factoring of `target` down to 3 (see [`factor_with_foldback`]),
+/// memoised per thread: every fit attempt of every strategy asks again for the same covers. The
+/// factoring also registers its foldbacks in FOLDS, which planning resets before it factors for
+/// real, so a cached answer loses nothing.
+fn factored_len(target: &Sop) -> usize {
+    thread_local! {
+        static FACTORED: std::cell::RefCell<rustc_hash::FxHashMap<Sop, usize>> = Default::default();
+    }
+    if let Some(n) = FACTORED.with(|m| m.borrow().get(target).copied()) {
+        return n;
+    }
+    let mut s = target.0.clone();
+    while s.len() > 3 {
+        match factor_with_foldback(&s) {
+            Some(x) => s = x,
+            None => break,
+        }
+    }
+    FACTORED.with(|m| {
+        let mut m = m.borrow_mut();
+        if m.len() > 1 << 14 {
+            m.clear();
+        }
+        m.insert(target.clone(), s.len());
+    });
+    s.len()
+}
+
 /// Estimated product terms a cell needs in its macrocell (sum + special functions).
 fn pt_demand(c: &Cell, xor: Option<&XorSplit>) -> usize {
     let target = if c.active_low { c.data.complement() } else { c.data.clone() };
@@ -1604,15 +1643,7 @@ fn pt_demand(c: &Cell, xor: Option<&XorSplit>) -> usize {
         n = n.min(alt.max(1));
     }
     if n > 3 {
-        // foldback factoring (see factor_with_foldback); the FOLDS registry is reset before planning
-        let mut s = target.0.clone();
-        while s.len() > 3 {
-            match factor_with_foldback(&s) {
-                Some(x) => s = x,
-                None => break,
-            }
-        }
-        n = n.min(s.len());
+        n = n.min(factored_len(&target));
     }
     let single_pad = |s: &Option<Sop>| s.as_ref().map_or(false, |x| matches!(x.single_literal(), Some((Signal::Pad(_), _))));
     if c.clk.is_some() && !single_pad(&c.clk) {

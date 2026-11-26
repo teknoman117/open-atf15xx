@@ -520,6 +520,15 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
             let (pd, plog) = slot.get_or_init(|| {
                 let mut d = base.clone();
                 let mut log: Vec<String> = vec![];
+                // with ATF15XX_FLOW_DEBUG, the time of each netlist pass
+                let dbg = std::env::var_os("ATF15XX_FLOW_DEBUG").is_some();
+                let mut tp = std::time::Instant::now();
+                let mut lap = |what: &str| {
+                    if dbg {
+                        eprintln!("pass {what}: {:.2} s", tp.elapsed().as_secs_f64());
+                    }
+                    tp = std::time::Instant::now();
+                };
                     if toggles {
                         log.push(format!("{} T flip-flops", opt::recover_toggles(&mut d, mp)));
                         opt::remove_dead(&mut d);
@@ -527,10 +536,12 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
                         if chains > 0 {
                             log.push(format!("{chains} carry-chain nodes"));
                         }
+                        lap("toggles");
                     }
                     if enables {
                         log.push(format!("{} clock enables", opt::recover_enables(&mut d, mp)));
                         opt::remove_dead(&mut d);
+                        lap("enables");
                     }
                     if let (Some(n), Some(c)) = (std::env::var("ATF15XX_FLOW_TRACE").ok(), None::<()>.or(Some(()))) {
                         let _ = c;
@@ -539,6 +550,7 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
                         }
                     }
                     opt::collapse_limited(&mut d, mp, ties);
+                    lap("collapse");
                     if let Ok(n) = std::env::var("ATF15XX_FLOW_TRACE") {
                         if let Some(cell) = d.cell(&n) {
                             eprintln!("trace {n} after collapse: data {:?} ce {:?}", cell.data, cell.ce);
@@ -550,6 +562,7 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
                     if splits > 0 {
                         log.push(format!("{splits} OR nodes split off"));
                     }
+                    lap("split");
                 (d, log)
             });
             let mut d = pd.clone();

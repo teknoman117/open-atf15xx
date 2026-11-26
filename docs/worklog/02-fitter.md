@@ -107,6 +107,18 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — Time to failure, continued (16-bit registered compare, ATF1508AS-TQFP100):
+  gate mapping 126 → 5.0 s, word mapping 324 → 8.3 s, same fits (54 / 65 MCs). (1) `pt_demand`'s
+  foldback-factoring estimate is memoised per thread (`factored_len`): each of the 7 fit attempts
+  of each strategy re-factored the same 128-product cover (3.9 s per attempt). (2) A cell whose
+  estimate exceeds what one block's cascade chain holds (`MAX_CHAIN_PTS` = 80) is rejected as soon
+  as the estimate is known, with that reason (placement uses the same estimate, so it could never
+  be placed; before, the attempt failed later as "no free macrocell for node ..."). (3)
+  `split_large` asks `Sop::complement_within(16384 cubes)` whether the complement is cheaper: the
+  16-product, 32-signal `lt` cover's complement took 281 s to compute and was not cheaper. Within
+  the plain complement's 4096 cubes the answer is unchanged. (4) `ATF15XX_FLOW_DEBUG` times each
+  netlist pass (`pass toggles|enables|collapse|split`). Checks: vendor identity unchanged, corpus
+  (37) and examples byte-identical, SELFPROGRAMBOARD unchanged, tests 48/48.
 * **2026-11-26** — Time to failure (user: "the time bounds before failure are not so horrible on
   designs that won't fit"). (1) `logic::complement`: the plain Shannon expansion runs as before up
   to 4096 raw cubes; beyond that `complement_folded` recombines the halves at every split (a cube

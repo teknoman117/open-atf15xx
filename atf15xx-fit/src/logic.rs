@@ -163,6 +163,21 @@ impl Sop {
         })
     }
 
+    /// The complement, or None when computing it would pass `max_cubes` intermediate cubes: for
+    /// callers that only ask whether the complement is *cheaper* (a function whose complement
+    /// needs that many cubes is not). Within [`PLAIN_COMPLEMENT_LIMIT`] the result is exactly
+    /// [`Sop::complement`]'s; functions of more than 64 signals return None.
+    pub fn complement_within(&self, max_cubes: usize) -> Option<Sop> {
+        let (vars, cover) = self.encode();
+        let c = cover?;
+        let mut budget = PLAIN_COMPLEMENT_LIMIT;
+        if complement_plain(&c, vars.len(), &mut budget).is_some() {
+            return Some(self.complement());
+        }
+        let raw = complement_folded_within(&c, vars.len(), max_cubes)?;
+        Some(decode(&vars, &irredundant(&merge(raw))))
+    }
+
     /// The complement if it has at most `max_products` products (None otherwise). Wide
     /// functions (more than 64 signals) are complemented symbolically within the same bound.
     pub fn try_complement(&self, max_products: usize) -> Option<Sop> {
@@ -359,23 +374,28 @@ fn split_var(c: &[Cube], n: usize) -> usize {
 /// (`x·p + !x·q` with `p ⊆ q` covers `p`). The result is a cover of the complement, much smaller
 /// than the plain expansion's on XOR-rich functions.
 fn complement_folded(c: &[Cube], n: usize) -> Vec<Cube> {
+    complement_folded_within(c, n, usize::MAX).expect("unbounded")
+}
+
+/// [`complement_folded`], `None` as soon as one level's result exceeds `max_cubes` cubes.
+fn complement_folded_within(c: &[Cube], n: usize, max_cubes: usize) -> Option<Vec<Cube>> {
     if c.is_empty() {
-        return vec![Cube { care: 0, val: 0 }];
+        return Some(vec![Cube { care: 0, val: 0 }]);
     }
     if c.iter().any(|x| x.care == 0) {
-        return vec![];
+        return Some(vec![]);
     }
     if c.len() == 1 {
         let x = c[0];
-        return (0..n)
-            .filter(|i| x.care >> i & 1 == 1)
-            .map(|i| Cube { care: 1 << i, val: !x.val & (1 << i) })
-            .collect();
+        return Some((0..n).filter(|i| x.care >> i & 1 == 1).map(|i| Cube { care: 1 << i, val: !x.val & (1 << i) }).collect());
     }
     let i = split_var(c, n);
     let b = 1u64 << i;
-    let r1 = complement_folded(&cofactor(c, i, true), n);
-    let r0 = complement_folded(&cofactor(c, i, false), n);
+    let r1 = complement_folded_within(&cofactor(c, i, true), n, max_cubes)?;
+    let r0 = complement_folded_within(&cofactor(c, i, false), n, max_cubes)?;
+    if r1.len() + r0.len() > max_cubes {
+        return None;
+    }
     let in0: std::collections::BTreeSet<Cube> = r0.iter().copied().collect();
     let in1: std::collections::BTreeSet<Cube> = r1.iter().copied().collect();
     let mut out: Vec<Cube> = vec![];
@@ -400,7 +420,7 @@ fn complement_folded(c: &[Cube], n: usize) -> Vec<Cube> {
     out.dedup();
     let snap = out.clone();
     out.retain(|x| !snap.iter().any(|y| y != x && y.contains(x)));
-    out
+    Some(out)
 }
 
 /// The plain Shannon complement; `None` once it has produced more than `budget` cubes.
