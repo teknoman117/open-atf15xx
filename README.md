@@ -8,8 +8,8 @@ design.v ──Yosys──► netlist ──atf15xx-synth──► design.jed �
              (or the Yosys plugin: synth_atf15xx)    fitter: placement, PTs, UIM, timing
 ```
 
-The vendor tools serve only as black-box oracles: our fitter reproduces their fuse maps bit for
-bit on thousands of test designs, our SVF writer reproduces the vendor programming software's
+The vendor tools serve only as black-box oracles: our fitter reproduces their fuse maps fuse for
+fuse on 92.8–99.7 % of thousands of synthetic test designs (and on all 95 regression vectors), our SVF writer reproduces the vendor programming software's
 output byte for byte, and the architecture facts are checked on a real ATF1508AS. JEDEC files are
 written in our own layout.
 

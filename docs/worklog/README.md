@@ -42,8 +42,10 @@ end. It has these sections, in this order:
 Rules:
 - **All work is tracked in git** (repository root). Commit after every milestone, with a message
   that says what changed and why, and update the log in the same commit. Stage only the files
-  your workstream owns (`git add <paths>`, never `git add -A`). End messages with the
-  `Co-Authored-By` trailer. Don't rewrite history and don't push: this repository has no remote.
+  your workstream owns (`git add <paths>`, never `git add -A`). No `Co-Authored-By` trailer (the
+  user's instruction). The remote `origin` (github.com/teknoman117/open-atf15xx) is public: push,
+  tag or rewrite history only when the user asks; the pre-0.1.0 history (local branch `pre`) is
+  never pushed. The project rules for every session are in the root `CLAUDE.md`.
   Changes to upstream projects (the `external/prjbureau` submodule) are made on branches of the
   user's fork, checked out as worktrees under `.worktrees/<project>/<branch>` (git-ignored), and
   pushed there; `docs/prjbureau/branches.md` indexes them. There is no `patches/` directory.

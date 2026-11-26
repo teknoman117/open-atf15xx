@@ -1,7 +1,7 @@
 # common: rules for every fuzzing run
 
 * **One wine job per prefix at a time.** ATMISP (`atmisp_oracle.py`) opens a wine virtual
-  desktop; two runs on one prefix interfere. Check with `pgrep -af 'wine|ATMISP|fit150'` first.
+  desktop; two runs on one prefix interfere. Check with `pgrep -fa 'wine|ATMISP|fit15|drive.exe'` first.
   The container has its own prefix, so a container job and a host job may run together.
 * **Fitters must not share a directory.** The vendor fitter writes temporary files with fixed
   names into its own directory; concurrent fitters there corrupt about 1 result in 400, silently.
