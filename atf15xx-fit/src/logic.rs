@@ -325,7 +325,40 @@ fn cofactor(c: &[Cube], i: usize, v: bool) -> Vec<Cube> {
         .collect()
 }
 
+/// The complement as a cube list (merged and made irredundant by the caller). The plain Shannon
+/// expansion ([`complement_plain`]) is tried first, as it always was, so every result it gives
+/// within [`PLAIN_COMPLEMENT_LIMIT`] cubes is unchanged; beyond that (XOR-rich functions:
+/// comparators, parity, where its output grows exponentially and its minimisation took
+/// minutes) [`complement_folded`] merges the two halves at every split instead.
 fn complement(c: &[Cube], n: usize) -> Vec<Cube> {
+    let mut budget = PLAIN_COMPLEMENT_LIMIT;
+    match complement_plain(c, n, &mut budget) {
+        Some(v) => v,
+        None => complement_folded(c, n),
+    }
+}
+
+/// Raw cubes the plain complement may produce before [`complement_folded`] takes over.
+const PLAIN_COMPLEMENT_LIMIT: usize = 4096;
+
+/// The splitting variable: the one most cubes depend on (the first such).
+fn split_var(c: &[Cube], n: usize) -> usize {
+    let mut best = (0, 0usize);
+    for i in 0..n {
+        let b = 1u64 << i;
+        let k = c.iter().filter(|x| x.care & b != 0).count();
+        if k > best.1 {
+            best = (i, k);
+        }
+    }
+    best.0
+}
+
+/// Shannon complement with the halves recombined: a cube in both halves loses the split
+/// variable, and so does a cube of one half contained in a cube of the other
+/// (`x·p + !x·q` with `p ⊆ q` covers `p`). The result is a cover of the complement, much smaller
+/// than the plain expansion's on XOR-rich functions.
+fn complement_folded(c: &[Cube], n: usize) -> Vec<Cube> {
     if c.is_empty() {
         return vec![Cube { care: 0, val: 0 }];
     }
@@ -339,6 +372,52 @@ fn complement(c: &[Cube], n: usize) -> Vec<Cube> {
             .map(|i| Cube { care: 1 << i, val: !x.val & (1 << i) })
             .collect();
     }
+    let i = split_var(c, n);
+    let b = 1u64 << i;
+    let r1 = complement_folded(&cofactor(c, i, true), n);
+    let r0 = complement_folded(&cofactor(c, i, false), n);
+    let in0: std::collections::BTreeSet<Cube> = r0.iter().copied().collect();
+    let in1: std::collections::BTreeSet<Cube> = r1.iter().copied().collect();
+    let mut out: Vec<Cube> = vec![];
+    for p in &r1 {
+        if in0.contains(p) || r0.iter().any(|q| q.contains(p)) {
+            out.push(*p);
+        } else {
+            out.push(Cube { care: p.care | b, val: p.val | b });
+        }
+    }
+    for q in &r0 {
+        if in1.contains(q) {
+            continue; // already emitted without the literal
+        }
+        if r1.iter().any(|p| p.contains(q)) {
+            out.push(*q);
+        } else {
+            out.push(Cube { care: q.care | b, val: q.val & !b });
+        }
+    }
+    out.sort();
+    out.dedup();
+    let snap = out.clone();
+    out.retain(|x| !snap.iter().any(|y| y != x && y.contains(x)));
+    out
+}
+
+/// The plain Shannon complement; `None` once it has produced more than `budget` cubes.
+fn complement_plain(c: &[Cube], n: usize, budget: &mut usize) -> Option<Vec<Cube>> {
+    if c.is_empty() {
+        return take(budget, vec![Cube { care: 0, val: 0 }]);
+    }
+    if c.iter().any(|x| x.care == 0) {
+        return Some(vec![]);
+    }
+    if c.len() == 1 {
+        let x = c[0];
+        return take(
+            budget,
+            (0..n).filter(|i| x.care >> i & 1 == 1).map(|i| Cube { care: 1 << i, val: !x.val & (1 << i) }).collect(),
+        );
+    }
     let mut best = (0, 0usize);
     for i in 0..n {
         let b = 1u64 << i;
@@ -351,13 +430,19 @@ fn complement(c: &[Cube], n: usize) -> Vec<Cube> {
     let b = 1u64 << i;
     let mut out = vec![];
     for (v, set) in [(true, b), (false, 0)] {
-        for mut x in complement(&cofactor(c, i, v), n) {
+        for mut x in complement_plain(&cofactor(c, i, v), n, budget)? {
             x.care |= b;
             x.val = (x.val & !b) | set;
             out.push(x);
         }
     }
-    out
+    Some(out)
+}
+
+/// Charge `v`'s cubes to the budget (`None` when it runs out).
+fn take(budget: &mut usize, v: Vec<Cube>) -> Option<Vec<Cube>> {
+    *budget = budget.checked_sub(v.len())?;
+    Some(v)
 }
 
 /// Repeatedly merge distance-1 cubes and drop contained cubes; expand when nothing else changes.
@@ -598,6 +683,42 @@ mod tests {
     /// The fast `merge` gives exactly the plain algorithm's cover (same cubes, same order) on
     /// random covers and their complements (the two inputs `Sop::minimize` and
     /// `Sop::complement` give it).
+    /// The folded complement is exactly the complement: on every point of the space, a point is
+    /// in it iff it is not in the cover (truth tables, random covers).
+    #[test]
+    fn folded_complement_is_exact() {
+        use rand::{Rng, SeedableRng};
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(11);
+        let hit = |c: &[Cube], m: u64| c.iter().any(|x| (m ^ x.val) & x.care == 0);
+        for _ in 0..300 {
+            let n = rng.random_range(1..=10usize);
+            let cover: Vec<Cube> = (0..rng.random_range(0..=20usize))
+                .map(|_| {
+                    let care: u64 = rng.random::<u64>() & ((1u64 << n) - 1);
+                    Cube { care, val: rng.random::<u64>() & care }
+                })
+                .collect();
+            let f = complement_folded(&cover, n);
+            for m in 0..(1u64 << n) {
+                assert_ne!(hit(&cover, m), hit(&f, m), "point {m:b} of {cover:?} -> {f:?}");
+            }
+        }
+        // XOR-rich: a == b over 8 bit pairs; the folded complement stays small
+        let n = 16;
+        let eq: Vec<Cube> = (0..256u64)
+            .map(|v| {
+                let mut val = 0;
+                for i in 0..8 {
+                    if v >> i & 1 == 1 {
+                        val |= 3 << (2 * i);
+                    }
+                }
+                Cube { care: (1 << n) - 1, val }
+            })
+            .collect();
+        assert!(complement_folded(&eq, n).len() <= 64);
+    }
+
     #[test]
     fn merge_equals_the_plain_algorithm() {
         use rand::{Rng, SeedableRng};

@@ -359,6 +359,29 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
         }
     }
     opts.created = o.created.clone();
+    // every register or latch needs a macrocell's flip-flop (logic doubling only pairs a buried
+    // register with combinatorial logic): more than the device has can never fit, whatever the
+    // strategies do, so say so before the (possibly long) mapping passes
+    let regs = imp.design.cells.iter().filter(|c| c.storage != atf15xx_fit::netlist::Storage::Comb).count();
+    let mcs = part.device.family.macrocells();
+    if regs > mcs {
+        return Err(format!("fit failed: {regs} registers need at least {regs} macrocells (one flip-flop each), the {part_name} has {mcs}"));
+    }
+    // likewise pins: outputs need I/O pins, inputs any pin
+    let (outs, ins) = (imp.design.cells.iter().filter(|c| c.is_output).count(), imp.design.inputs.len());
+    let dev = part.device;
+    let dedicated = [dev.gclk1, dev.gclk2_oe2, dev.oe1, dev.gclr].iter().collect::<std::collections::BTreeSet<_>>().len();
+    // inputs may also use the input-only and the dedicated (GCLK/OE/GCLR) pins
+    // with JTAG enabled its four pins are reserved
+    let jtag_io = if opts.jtag { dev.io_pins().filter(|(p, _)| dev.is_jtag_pin(*p)).count() } else { 0 };
+    let (io, input_only) = (dev.io_pins().count() - jtag_io, dev.input_only_pins().count() + dedicated);
+    if outs > io || outs + ins > io + input_only {
+        return Err(format!(
+            "fit failed: {outs} outputs and {ins} inputs need {} pins ({outs} of them I/O pins), the {part_name} has {} ({io} I/O)",
+            outs + ins,
+            io + input_only
+        ));
+    }
     // pins from attributes / constraints
     let mut d = std::mem::take(&mut imp.design);
     for p in &imp.ports {

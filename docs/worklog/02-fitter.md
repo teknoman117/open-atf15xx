@@ -107,6 +107,19 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — Time to failure (user: "the time bounds before failure are not so horrible on
+  designs that won't fit"). (1) `logic::complement`: the plain Shannon expansion runs as before up
+  to 4096 raw cubes; beyond that `complement_folded` recombines the halves at every split (a cube
+  in both halves, or contained in a cube of the other, loses the split variable), test
+  `folded_complement_is_exact` (truth tables; an 8-pair equality's complement stays ≤ 64 cubes).
+  (2) The flow fails at once when the design cannot fit whatever the strategies do: more
+  registers than macrocells, or more outputs / inputs than (non-JTAG) I/O / input pins (dedicated
+  GCLK/OE/GCLR pins counted). Measured: 14-input registered mux on the ATF1502AS 198 → 0.02 s;
+  72-bit accumulator on the ATF1508AS-TQFP100 133 → 0.02 s (82 pins for 80); 12-bit registered
+  compare (word mapping) 95 → 20 s; the 16-bit one now fits (was > 400 s; 126 s gates, 324 s
+  words: open). Checks: vendor identity unchanged (2017 / 4025 / 6155), corpus (37) and examples
+  byte-identical, SELFPROGRAMBOARD unchanged (flow 60 MCs 52.6 MHz, BOUNDED 21 vs the vendor JED;
+  fit1504 on the vendor `.tt2` 60 MCs 55.6 MHz; `.scratch/spm_oracle.sh`), tests 48/48.
 * **2026-11-26** — `logic::merge` (the merge/containment/expand loop behind `Sop::minimize` and
   `Sop::complement`) rewritten to give *exactly* the old result faster: the first mergeable pair
   of the sorted cover is found by looking up distance-1 neighbours in a sorted set, resuming

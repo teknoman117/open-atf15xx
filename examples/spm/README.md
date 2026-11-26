@@ -10,7 +10,7 @@ port; `selfprogramboard.acf` reproduces the original build settings (`compile.ba
 | vendor (WinCUPL → fit1504 1.8.7.8) | fits: **64/64** MCs, 32/32 I/O, 4/4 dedicated inputs, 47/64 foldbacks; the user reports it works in hardware |
 | vendor JED vs its `.tt2` | match (random simulation against the `.tt2`; equiv.py with the silicon-corrected cascade semantics) |
 | Verilog port vs the vendor JED | no difference in 23 formal steps (sat; loops prevent induction) + 4000 simulated steps; `equiv.py … --single-change --reset p1=0:2` |
-| our fitter on the vendor `.tt2` | does not fit yet: UIM routing of block A (46 inputs > 40) — placement (spec F9.5 R3) |
+| our fitter on the vendor `.tt2` | fits (2026-11-26): **60/64** MCs, 180 PTs, 1 foldback, fmax 55.6 MHz at -10 (the vendor's: 64 MCs, 191 PTs, 47 foldbacks, 50 MHz; `tools/flow/jed_stats.py`); 2026-11-24 it did not (UIM routing of block A, 46 inputs > 40) |
 | our Verilog flow | fits (2026-11-25): **60/64** MCs, fmax 52.6 MHz at -10 (`atf15xx-synth build`, below); on 2026-11-24 it did not (77 cells for 64 MCs) |
 
 Checking it reproduced two harness issues and one model error, all fixed 2026-11-24: vector ports
