@@ -96,7 +96,7 @@ Audit of 2026-11-24 (`.scratch/crate-eval`, `cargo info`, crates.io API):
 | fuse arrays | `Vec<bool>` in several crates | **`bitvec`** (what `jedec` returns) |
 | SVF | written by `atf15xx-tool`; Python regex in `jtag_guard.py` | validate every SVF we write with the **`svf`** parser in tests (parses 32/32 of ours; would reject ATMISP's backtick defect); port the guard to Rust on top of it |
 | errors | 27 library functions return `Result<_, String>`; `atf15xx-sim` uses `anyhow` | **`thiserror`** enums in library crates (`FitError`, flow, arch), `anyhow` only in binaries |
-| JSON documents | `serde_json::Value` walking (Yosys netlist, report) | `#[derive(Deserialize)]` structs for the Yosys JSON schema |
+| JSON documents | `serde_json::Value` walking (Yosys netlist, report) | `#[derive(Deserialize)]` structs for the Yosys JSON schema (**done** 2026-11-26 for the netlist: `atf15xx-synth/src/ynet.rs`, F9.7 item 1) |
 | graph algorithms | hand-written bipartite matching (UIM) | **keep**: it must reproduce the vendor's preference order (lowest candidate mux first) for byte identity; `petgraph`'s matching would not. Document why |
 | SOP minimisation | own (`logic.rs`: unate recursive complement, irredundant cover) | keep for now (no maintained Rust espresso; ABC's `cover` is the reference); consider binding ABC through the Yosys plugin instead |
 | JTAG | OpenOCD | optional Rust path via `jtag-taps` (§4) |

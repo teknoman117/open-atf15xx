@@ -15,7 +15,7 @@
 //! lower are left for Yosys's techmap ([`UNSUPPORTED`]); the Yosys plugin decides that per
 //! design, the CLI's script lists them.
 
-use serde_json::{json, Map, Value};
+use crate::ynet::{self, Bit, Const, Netlist};
 use std::collections::BTreeMap;
 
 /// A bit: a net or a constant (`x`/`z` are taken as 0).
@@ -48,7 +48,7 @@ struct Ctx {
     next: u64,
     n: usize,
     alias: BTreeMap<u64, Lb>,
-    out: Map<String, Value>,
+    out: BTreeMap<String, ynet::Cell>,
     xors: BTreeMap<(Lb, Lb), Lb>,
 }
 
@@ -119,17 +119,21 @@ impl Ctx {
         self.next += 1;
         let name = format!("$atf15xx$wordmap${}", self.n);
         self.n += 1;
-        let a: Vec<Value> = ins.iter().map(|b| bit_value(*b)).collect();
+        let a: Vec<Bit> = ins.iter().map(|b| bit_value(*b)).collect();
         let tstr: String = table.iter().rev().map(|&x| if x { '1' } else { '0' }).collect();
         self.out.insert(
             name,
-            json!({
-                "hide_name": 1, "type": "$sop",
-                "parameters": { "WIDTH": w, "DEPTH": prods.len(), "TABLE": tstr },
-                "attributes": {},
-                "port_directions": { "A": "input", "Y": "output" },
-                "connections": { "A": a, "Y": [y] }
-            }),
+            ynet::Cell {
+                ty: "$sop".into(),
+                parameters: BTreeMap::from([
+                    ("WIDTH".to_string(), Const::Int(w as i64)),
+                    ("DEPTH".to_string(), Const::Int(prods.len() as i64)),
+                    ("TABLE".to_string(), Const::Str(tstr)),
+                ]),
+                attributes: BTreeMap::new(),
+                port_directions: Some(BTreeMap::from([("A".to_string(), "input".to_string()), ("Y".to_string(), "output".to_string())])),
+                connections: BTreeMap::from([("A".to_string(), a), ("Y".to_string(), vec![Bit::Net(y)])]),
+            },
         );
         Lb::Net(y)
     }
@@ -200,33 +204,32 @@ impl Ctx {
     }
 }
 
-fn bit_value(b: Lb) -> Value {
+fn bit_value(b: Lb) -> Bit {
     match b {
-        Lb::Net(n) => json!(n),
-        Lb::C(true) => json!("1"),
-        Lb::C(false) => json!("0"),
+        Lb::Net(n) => Bit::Net(n),
+        Lb::C(true) => Bit::Const('1'),
+        Lb::C(false) => Bit::Const('0'),
     }
 }
 
-fn to_lb(v: &Value) -> Lb {
+fn to_lb(v: &Bit) -> Lb {
     match v {
-        Value::Number(n) => Lb::Net(n.as_u64().unwrap_or(0)),
-        Value::String(s) => Lb::C(s == "1"),
-        _ => Lb::C(false),
+        Bit::Net(n) => Lb::Net(*n),
+        Bit::Const(c) => Lb::C(*c == '1'),
     }
 }
 
-fn param(c: &Value, k: &str) -> usize {
-    match &c["parameters"][k] {
-        Value::Number(n) => n.as_u64().unwrap_or(0) as usize,
-        Value::String(s) => s.chars().rev().enumerate().filter(|(_, c)| *c == '1').map(|(i, _)| 1usize << i).sum(),
+fn param(c: &ynet::Cell, k: &str) -> usize {
+    match c.parameters.get(k) {
+        Some(Const::Int(n)) => u64::try_from(*n).unwrap_or(0) as usize,
+        Some(Const::Str(s)) => s.chars().rev().enumerate().filter(|(_, c)| *c == '1').map(|(i, _)| 1usize << i).sum(),
         _ => 0,
     }
 }
 
 /// Port `p` of cell `c`, extended to `w` bits (sign-extended if `signed`).
-fn port(ctx: &Ctx, c: &Value, p: &str, w: usize, signed: bool) -> Vec<Lb> {
-    let mut v: Vec<Lb> = c["connections"][p].as_array().map(|a| a.iter().map(|b| ctx.res(to_lb(b))).collect()).unwrap_or_default();
+fn port(ctx: &Ctx, c: &ynet::Cell, p: &str, w: usize, signed: bool) -> Vec<Lb> {
+    let mut v: Vec<Lb> = c.port(p).iter().map(|b| ctx.res(to_lb(b))).collect();
     let fill = if signed { v.last().copied().unwrap_or(Lb::C(false)) } else { Lb::C(false) };
     v.truncate(w);
     while v.len() < w {
@@ -292,38 +295,34 @@ fn add(ctx: &mut Ctx, a: &[Lb], b: &[Lb], cin: Lb) -> Vec<Lb> {
 
 /// Lower the coarse cells of a module (Yosys JSON schema, in place). Returns the number of
 /// coarse cells lowered; `Err` names a coarse cell type that is neither lowered nor a fine cell.
-pub fn lower_module(m: &mut Value) -> Result<usize, String> {
-    let cells = m["cells"].as_object().cloned().unwrap_or_default();
+pub fn lower_module(m: &mut ynet::Module) -> Result<usize, String> {
+    let cells = m.cells.clone();
     let mut next = 2;
-    let mut scan = |v: &Value| {
-        if let Some(a) = v.as_array() {
-            for b in a {
-                if let Some(n) = b.as_u64() {
-                    next = next.max(n + 1);
-                }
+    let mut scan = |v: &[Bit]| {
+        for b in v {
+            if let Bit::Net(n) = b {
+                next = next.max(n + 1);
             }
         }
     };
     for c in cells.values() {
-        if let Some(cs) = c["connections"].as_object() {
-            cs.values().for_each(&mut scan);
-        }
+        c.connections.values().for_each(|v| scan(v));
     }
-    for n in m["netnames"].as_object().into_iter().flat_map(|x| x.values()) {
-        scan(&n["bits"]);
+    for n in m.netnames.values() {
+        scan(&n.bits);
     }
-    for p in m["ports"].as_object().into_iter().flat_map(|x| x.values()) {
-        scan(&p["bits"]);
+    for p in m.ports.iter().flat_map(|x| x.values()) {
+        scan(&p.bits);
     }
     // driver of every coarse output bit, for a topological order (inputs first)
     let lowered = |t: &str| LOWERED.contains(&t);
     let mut driver: BTreeMap<u64, String> = BTreeMap::new();
     for (name, c) in &cells {
-        let t = c["type"].as_str().unwrap_or("");
+        let t = c.ty.as_str();
         if lowered(t) {
-            for b in c["connections"]["Y"].as_array().into_iter().flatten() {
-                if let Some(n) = b.as_u64() {
-                    driver.insert(n, name.clone());
+            for b in c.port("Y") {
+                if let Bit::Net(n) = b {
+                    driver.insert(*n, name.clone());
                 }
             }
         } else if t.starts_with('$') && !t.starts_with("$_") && t != "$sop" && t != "$scopeinfo" {
@@ -332,7 +331,7 @@ pub fn lower_module(m: &mut Value) -> Result<usize, String> {
     }
     let mut order: Vec<String> = vec![];
     let mut state: BTreeMap<String, u8> = BTreeMap::new();
-    fn visit(n: &str, cells: &Map<String, Value>, driver: &BTreeMap<u64, String>, state: &mut BTreeMap<String, u8>, order: &mut Vec<String>) {
+    fn visit(n: &str, cells: &BTreeMap<String, ynet::Cell>, driver: &BTreeMap<u64, String>, state: &mut BTreeMap<String, u8>, order: &mut Vec<String>) {
         match state.get(n) {
             Some(_) => return,
             None => {
@@ -340,15 +339,13 @@ pub fn lower_module(m: &mut Value) -> Result<usize, String> {
             }
         }
         let c = &cells[n];
-        if let Some(cs) = c["connections"].as_object() {
-            for (p, v) in cs {
-                if p == "Y" {
-                    continue;
-                }
-                for b in v.as_array().into_iter().flatten() {
-                    if let Some(d) = b.as_u64().and_then(|x| driver.get(&x)) {
-                        visit(d, cells, driver, state, order);
-                    }
+        for (p, v) in &c.connections {
+            if p == "Y" {
+                continue;
+            }
+            for b in v {
+                if let Some(d) = match b { Bit::Net(x) => driver.get(x), Bit::Const(_) => None } {
+                    visit(d, cells, driver, state, order);
                 }
             }
         }
@@ -356,15 +353,15 @@ pub fn lower_module(m: &mut Value) -> Result<usize, String> {
         order.push(n.to_string());
     }
     for (name, c) in &cells {
-        if lowered(c["type"].as_str().unwrap_or("")) {
+        if lowered(&c.ty) {
             visit(name, &cells, &driver, &mut state, &mut order);
         }
     }
-    let mut ctx = Ctx { next, n: 0, alias: BTreeMap::new(), out: Map::new(), xors: BTreeMap::new() };
+    let mut ctx = Ctx { next, n: 0, alias: BTreeMap::new(), out: BTreeMap::new(), xors: BTreeMap::new() };
     for name in &order {
         let c = &cells[name];
-        let t = c["type"].as_str().unwrap_or("");
-        let yw = param(c, "Y_WIDTH").max(c["connections"]["Y"].as_array().map_or(0, |a| a.len()));
+        let t = c.ty.as_str();
+        let yw = param(c, "Y_WIDTH").max(c.port("Y").len());
         let (asg, bsg) = (param(c, "A_SIGNED") == 1, param(c, "B_SIGNED") == 1);
         let both = asg && bsg;
         let aw = param(c, "A_WIDTH");
@@ -499,8 +496,8 @@ pub fn lower_module(m: &mut Value) -> Result<usize, String> {
             }
             _ => unreachable!(),
         };
-        for (yb, v) in c["connections"]["Y"].as_array().into_iter().flatten().zip(y) {
-            if let Some(n) = yb.as_u64() {
+        for (yb, v) in c.port("Y").iter().zip(y) {
+            if let Bit::Net(n) = *yb {
                 let v = ctx.res(v);
                 if v != Lb::Net(n) {
                     ctx.alias.insert(n, v);
@@ -510,50 +507,40 @@ pub fn lower_module(m: &mut Value) -> Result<usize, String> {
     }
     // a lowered cell whose output is another net: drive the original bit with a buffer if it is a
     // port or a kept name (simplest: rewrite every reference through the aliases)
-    let rewrite = |v: &mut Value, ctx: &Ctx| {
-        if let Some(a) = v.as_array_mut() {
-            for b in a.iter_mut() {
-                if let Some(n) = b.as_u64() {
-                    let r = ctx.res(Lb::Net(n));
-                    if r != Lb::Net(n) {
-                        *b = bit_value(r);
-                    }
+    let rewrite = |v: &mut Vec<Bit>, ctx: &Ctx| {
+        for b in v.iter_mut() {
+            if let Bit::Net(n) = *b {
+                let r = ctx.res(Lb::Net(n));
+                if r != Lb::Net(n) {
+                    *b = bit_value(r);
                 }
             }
         }
     };
     let count = order.len();
-    let mut new_cells = Map::new();
+    let mut new_cells = BTreeMap::new();
     for (name, mut c) in cells {
-        if lowered(c["type"].as_str().unwrap_or("")) {
+        if lowered(&c.ty) {
             continue;
         }
-        if let Some(cs) = c["connections"].as_object_mut() {
-            for v in cs.values_mut() {
-                rewrite(v, &ctx);
-            }
+        for v in c.connections.values_mut() {
+            rewrite(v, &ctx);
         }
         new_cells.insert(name, c);
     }
     let gen = std::mem::take(&mut ctx.out);
     for (name, mut c) in gen {
-        if let Some(cs) = c["connections"].as_object_mut() {
-            for v in cs.values_mut() {
-                rewrite(v, &ctx);
-            }
+        for v in c.connections.values_mut() {
+            rewrite(v, &ctx);
         }
         new_cells.insert(name, c);
     }
-    m["cells"] = Value::Object(new_cells);
-    if let Some(ps) = m["ports"].as_object_mut() {
-        for p in ps.values_mut() {
-            rewrite(&mut p["bits"], &ctx);
-        }
+    m.cells = new_cells;
+    for p in m.ports.iter_mut().flat_map(|x| x.values_mut()) {
+        rewrite(&mut p.bits, &ctx);
     }
-    if let Some(ns) = m["netnames"].as_object_mut() {
-        for n in ns.values_mut() {
-            rewrite(&mut n["bits"], &ctx);
-        }
+    for n in m.netnames.values_mut() {
+        rewrite(&mut n.bits, &ctx);
     }
     Ok(count)
 }
@@ -566,19 +553,15 @@ fn widen(r: Lb, yw: usize) -> Vec<Lb> {
 }
 
 /// Does the netlist contain coarse cells this module lowers?
-pub fn has_coarse(netlist: &Value) -> bool {
-    netlist["modules"].as_object().into_iter().flat_map(|ms| ms.values()).any(|m| {
-        m["cells"].as_object().into_iter().flat_map(|cs| cs.values()).any(|c| LOWERED.contains(&c["type"].as_str().unwrap_or("")))
-    })
+pub fn has_coarse(netlist: &Netlist) -> bool {
+    netlist.modules.values().any(|m| m.cells.values().any(|c| LOWERED.contains(&c.ty.as_str())))
 }
 
-/// Lower every module of a netlist (`{"modules": …}`).
-pub fn lower(netlist: &mut Value) -> Result<usize, String> {
+/// Lower every module of a netlist.
+pub fn lower(netlist: &mut Netlist) -> Result<usize, String> {
     let mut n = 0;
-    if let Some(ms) = netlist["modules"].as_object_mut() {
-        for m in ms.values_mut() {
-            n += lower_module(m)?;
-        }
+    for m in netlist.modules.values_mut() {
+        n += lower_module(m)?;
     }
     Ok(n)
 }

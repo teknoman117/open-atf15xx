@@ -16,7 +16,9 @@ use std::pin::Pin;
 
 use crate::constraints::Constraints;
 use crate::flow::{self, FlowOptions, InitPolicy, MapMode};
-use serde_json::{json, Map, Value};
+use crate::ynet::{self, Bit, Const, Netlist};
+use serde_json::Value;
+use std::collections::BTreeMap;
 
 #[cxx::bridge(namespace = "atf15xx")]
 mod ffi {
@@ -107,88 +109,71 @@ mod ffi {
 
 use ffi::{Design, FitArgs, Kv, ModuleRec};
 
-fn kv_map(kvs: &[Kv]) -> Value {
-    let mut m = Map::new();
-    for k in kvs {
-        let v = match k.kind {
-            1 | 2 => json!(k.int_val),
-            _ => Value::String(k.text.clone()),
-        };
-        m.insert(k.key.clone(), v);
-    }
-    Value::Object(m)
+fn consts(kvs: &[Kv]) -> BTreeMap<String, Const> {
+    kvs.iter()
+        .map(|k| {
+            let v = match k.kind {
+                1 | 2 => Const::Int(k.int_val),
+                _ => Const::Str(k.text.clone()),
+            };
+            (k.key.clone(), v)
+        })
+        .collect()
 }
 
-fn bits(b: &[i64]) -> Value {
-    Value::Array(
-        b.iter()
-            .map(|&x| match x {
-                -1 => json!("0"),
-                -2 => json!("1"),
-                -3 => json!("x"),
-                -4 => json!("z"),
-                n => json!(n),
-            })
-            .collect(),
-    )
+fn bits(b: &[i64]) -> Vec<Bit> {
+    b.iter()
+        .map(|&x| match x {
+            -1 => Bit::Const('0'),
+            -2 => Bit::Const('1'),
+            -3 => Bit::Const('x'),
+            -4 => Bit::Const('z'),
+            n => Bit::Net(n as u64),
+        })
+        .collect()
 }
 
-/// The modules as the Yosys JSON schema (`{"modules": …}`), without a text round trip.
-pub fn netlist_value(mods: &[ModuleRec]) -> Value {
-    let mut out = Map::new();
+/// The modules as a typed netlist (spec F9.7 item 1), filled straight from RTLIL: the same
+/// structs the JSON reader fills, so the importer cannot tell the two producers apart.
+pub fn netlist(mods: &[ModuleRec]) -> Netlist {
+    let mut modules = BTreeMap::new();
     for m in mods {
-        let mut ports = Map::new();
-        for p in &m.ports {
-            let mut o = Map::new();
-            o.insert("direction".into(), json!(p.dir));
-            if p.offset != 0 {
-                o.insert("offset".into(), json!(p.offset));
-            }
-            if p.upto {
-                o.insert("upto".into(), json!(1));
-            }
-            if p.signed_ {
-                o.insert("signed".into(), json!(1));
-            }
-            o.insert("bits".into(), bits(&p.bits));
-            ports.insert(p.name.clone(), Value::Object(o));
-        }
-        let mut cells = Map::new();
-        for c in &m.cells {
-            let mut o = Map::new();
-            o.insert("hide_name".into(), json!(if c.public_name { 0 } else { 1 }));
-            o.insert("type".into(), json!(c.ty));
-            o.insert("parameters".into(), kv_map(&c.params));
-            o.insert("attributes".into(), kv_map(&c.attrs));
-            if c.known {
-                o.insert("port_directions".into(), Value::Object(c.conns.iter().map(|k| (k.port.clone(), json!(k.dir))).collect()));
-            }
-            o.insert("connections".into(), Value::Object(c.conns.iter().map(|k| (k.port.clone(), bits(&k.bits))).collect()));
-            cells.insert(c.name.clone(), Value::Object(o));
-        }
-        let mut nets = Map::new();
-        for w in &m.wires {
-            let mut o = Map::new();
-            o.insert("hide_name".into(), json!(if w.public_name { 0 } else { 1 }));
-            o.insert("bits".into(), bits(&w.bits));
-            if w.offset != 0 {
-                o.insert("offset".into(), json!(w.offset));
-            }
-            if w.upto {
-                o.insert("upto".into(), json!(1));
-            }
-            if w.signed_ {
-                o.insert("signed".into(), json!(1));
-            }
-            o.insert("attributes".into(), kv_map(&w.attrs));
-            nets.insert(w.name.clone(), Value::Object(o));
-        }
-        out.insert(
-            m.name.clone(),
-            json!({ "attributes": kv_map(&m.attrs), "ports": ports, "cells": cells, "netnames": nets }),
-        );
+        let ports = m
+            .ports
+            .iter()
+            .map(|p| (p.name.clone(), ynet::Port { direction: p.dir.clone(), bits: bits(&p.bits) }))
+            .collect();
+        let cells = m
+            .cells
+            .iter()
+            .map(|c| {
+                let cell = ynet::Cell {
+                    ty: c.ty.clone(),
+                    parameters: consts(&c.params),
+                    attributes: consts(&c.attrs),
+                    port_directions: c.known.then(|| c.conns.iter().map(|k| (k.port.clone(), k.dir.clone())).collect()),
+                    connections: c.conns.iter().map(|k| (k.port.clone(), bits(&k.bits))).collect(),
+                };
+                (c.name.clone(), cell)
+            })
+            .collect();
+        let netnames = m
+            .wires
+            .iter()
+            .map(|w| {
+                let n = ynet::NetName {
+                    hide_name: u64::from(!w.public_name),
+                    bits: bits(&w.bits),
+                    offset: i64::from(w.offset),
+                    upto: i64::from(w.upto),
+                    attributes: consts(&w.attrs),
+                };
+                (w.name.clone(), n)
+            })
+            .collect();
+        modules.insert(m.name.clone(), ynet::Module { attributes: consts(&m.attrs), ports: Some(ports), cells, netnames });
     }
-    json!({ "modules": out })
+    Netlist { modules }
 }
 
 /// Placement annotations from the flow's `map.json`: per placed cell, its Yosys source net gets
@@ -245,7 +230,7 @@ fn synth_and_fit(mut design: Pin<&mut Design>, a: &FitArgs) -> Result<String, St
         }
         let mut notes = vec![];
         // 1. Yosys (not thread-safe): each mapping's script from the saved RTLIL, its netlist read
-        let mut netlists: Vec<Value> = vec![];
+        let mut netlists: Vec<Netlist> = vec![];
         for (k, mode) in modes.iter().enumerate() {
             if k > 0 {
                 ffi::run_pass(design.as_mut(), "design -load atf15xx_rtl");
@@ -258,10 +243,10 @@ fn synth_and_fit(mut design: Pin<&mut Design>, a: &FitArgs) -> Result<String, St
             }
             // the netlist straight from RTLIL (word-level cells included for `words`)
             let mods = ffi::read_design(design.as_mut());
-            let netlist = netlist_value(&mods);
+            let netlist = netlist(&mods);
             if a.check_json {
-                let j: Value = serde_json::from_str(&ffi::json_text(design.as_mut())).map_err(|e| format!("JSON backend: {e}"))?;
-                if j["modules"] != netlist["modules"] {
+                let j = Netlist::from_json(&ffi::json_text(design.as_mut())).map_err(|e| format!("JSON backend: {e}"))?;
+                if j.modules != netlist.modules {
                     return Err(format!("-check-json ({mode:?}): the RTLIL bridge and the JSON backend disagree"));
                 }
                 notes.push(format!("-check-json ({mode:?}): RTLIL bridge netlist == JSON backend netlist"));
@@ -273,7 +258,7 @@ fn synth_and_fit(mut design: Pin<&mut Design>, a: &FitArgs) -> Result<String, St
         }
         // 2. the fits, in parallel (pure Rust), compared in order
         use rayon::prelude::*;
-        let fits: Vec<Result<flow::Outputs, String>> = netlists.par_iter().map(|n| flow::fit_value(n, &o, "yosys synth_atf15xx")).collect();
+        let fits: Vec<Result<flow::Outputs, String>> = netlists.par_iter().map(|n| flow::fit_netlist(n, &o, "yosys synth_atf15xx")).collect();
         let mut best: Option<(usize, flow::Outputs)> = None;
         let mut errs = vec![];
         for (k, (mode, fit)) in modes.iter().zip(fits).enumerate() {

@@ -183,10 +183,15 @@ by file name from their directory for CLI-identical results (`check_corpus.sh` d
 
 **What it enables next (R4 and beyond), in order:**
 
-1. **Typed netlist IR.** Replace the importer's `serde_json::Value` walking with typed structs
-   that both producers fill (`serde::Deserialize` for JSON files, the bridge for RTLIL). This is
-   also the crate-hygiene item of `docs/plan/open-source.md` §5. After it, `netlist_value`
-   disappears.
+1. **Typed netlist IR** (done 2026-11-26). `atf15xx-synth/src/ynet.rs` holds the Yosys netlist
+   schema as structs (`Netlist`, `Module`, `Port`, `Cell`, `NetName`, `Bit`, `Const`), filled by
+   `serde::Deserialize` from a JSON file or directly from RTLIL by the plugin (`plugin::netlist`,
+   replacing `netlist_value`). The importer (`yosys::import_netlist`), the word-level lowering
+   (`wordmap`) and the flow (`flow::fit_netlist`) read only these types; `-check-json` compares the
+   two producers' typed netlists. Maps are `BTreeMap`s, the iteration order `serde_json`'s default
+   map had, so results are unchanged: the 34 corpus JEDs and the four examples are byte-identical
+   to the `Value`-walking importer's (apart from the examples' `Created:` date), and the plugin is
+   fuse-identical to the CLI on all 34 with `-check-json` passing.
 2. **Coarse cut (R4).** `read_design` already carries any cell type and its parameters. Call it
    after `synth -run coarse` and map `$alu`/`$eq`/`$pmux`/FSM cells in Rust with their structure
    (carry chains as cascades and XOR, comparators as single wide products), instead of after
@@ -241,7 +246,7 @@ The BDD route reaches the same covers from any netlist, Yosys-generated or not, 
 the same equivalence proofs. The coarse cut remains available for structure the gate netlist
 cannot show, such as word grouping for placement clusters.
 
-**Follow-ups** (not part of R4): the typed netlist IR (F9.7 item 1), the mapping–placement loop
+**Follow-ups** (not part of R4): the typed netlist IR (F9.7 item 1, done 2026-11-26), the mapping–placement loop
 inside the plugin (F9.7 item 3), and a canonical cell order so results do not depend on the
 source path (F9.7 open issue).
 

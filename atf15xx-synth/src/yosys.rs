@@ -25,42 +25,13 @@
 
 use atf15xx_fit::logic::{Signal, Sop};
 use atf15xx_fit::netlist::{Cell, Design, Storage};
-use serde_json::Value;
+pub use crate::ynet::Bit;
+use crate::ynet::{self, Const, Netlist};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// A net bit: integer id or a constant.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Bit {
-    Net(u64),
-    Const(char),
-}
-
-fn bit(v: &Value) -> Result<Bit, String> {
-    match v {
-        Value::Number(n) => Ok(Bit::Net(n.as_u64().ok_or("bad bit")?)),
-        Value::String(s) => Ok(Bit::Const(s.chars().next().unwrap_or('x'))),
-        _ => Err("bad bit".into()),
-    }
-}
-
-fn bits(v: &Value) -> Result<Vec<Bit>, String> {
-    v.as_array().ok_or("bits not an array")?.iter().map(bit).collect()
-}
-
-/// Parameter as an unsigned big integer, returned as little-endian bit vector.
-fn param_bits(v: &Value) -> Result<Vec<bool>, String> {
-    match v {
-        Value::Number(n) => {
-            let x = n.as_u64().ok_or("negative parameter")?;
-            Ok((0..64).map(|i| (x >> i) & 1 == 1).collect())
-        }
-        Value::String(s) => Ok(s.chars().rev().map(|c| c == '1').collect()),
-        _ => Err("bad parameter".into()),
-    }
-}
-
-fn param_u(v: &Value) -> Result<usize, String> {
-    let b = param_bits(v)?;
+/// Parameter as an unsigned integer (a missing one is an error).
+fn param_u(v: Option<&Const>) -> Result<usize, String> {
+    let b = v.ok_or("bad parameter")?.bits()?;
     Ok(b.iter().enumerate().filter(|(_, &x)| x).map(|(i, _)| 1usize << i).sum())
 }
 
@@ -133,18 +104,22 @@ pub struct Imported {
 }
 
 /// Bits of an `init` attribute (LSB first): int, or MSB-first string of 0/1/x.
-fn init_bits(v: &Value, n: usize) -> Vec<Option<bool>> {
-    if let Some(i) = v.as_u64() {
+fn init_bits(v: &Const, n: usize) -> Vec<Option<bool>> {
+    if let Const::Int(i) = v {
+        let i = u64::try_from(*i).unwrap_or(0);
         return (0..n).map(|k| Some(k < 64 && (i >> k) & 1 == 1)).collect();
     }
-    let s = v.as_str().unwrap_or("");
+    let s = match v {
+        Const::Str(s) => s.as_str(),
+        _ => "",
+    };
     let mut out: Vec<Option<bool>> = s.chars().rev().map(|c| match c { '0' => Some(false), '1' => Some(true), _ => None }).collect();
     out.resize(n, None);
     out
 }
 
 struct Ctx<'a> {
-    cells: &'a serde_json::Map<String, Value>,
+    cells: &'a BTreeMap<String, ynet::Cell>,
     /// bit -> (cell name, output port)
     driver: BTreeMap<Bit, (String, String)>,
     names: BTreeMap<u64, (String, bool)>,
@@ -161,17 +136,16 @@ struct Ctx<'a> {
     origins: BTreeMap<String, String>,
 }
 
-fn conn(c: &Value, p: &str) -> Result<Bit, String> {
-    let b = bits(&c["connections"][p])?;
-    b.first().cloned().ok_or_else(|| format!("cell has no connection {p}"))
+fn conn(c: &ynet::Cell, p: &str) -> Result<Bit, String> {
+    c.port(p).first().cloned().ok_or_else(|| format!("cell has no connection {p}"))
 }
 
 /// `$sop` → list of products, each `(input index, positive)`.
-fn sop_terms(c: &Value) -> Result<Vec<Vec<(usize, bool)>>, String> {
-    let p = &c["parameters"];
-    let w = param_u(&p["WIDTH"])?;
-    let d = param_u(&p["DEPTH"])?;
-    let t = param_bits(&p["TABLE"])?;
+fn sop_terms(c: &ynet::Cell) -> Result<Vec<Vec<(usize, bool)>>, String> {
+    let p = &c.parameters;
+    let w = param_u(p.get("WIDTH"))?;
+    let d = param_u(p.get("DEPTH"))?;
+    let t = p.get("TABLE").ok_or("bad parameter")?.bits()?;
     let get = |i: usize| t.get(i).copied().unwrap_or(false);
     let mut terms = vec![];
     'term: for k in 0..d {
@@ -236,7 +210,7 @@ impl<'a> Ctx<'a> {
         }
         let (cn, _port) = self.driver.get(b).cloned().ok_or_else(|| format!("undriven net {}", self.net_name(b)))?;
         let c = &self.cells[&cn];
-        match c["type"].as_str().unwrap_or("") {
+        match c.ty.as_str() {
             "$_NOT_" => {
                 let a = conn(c, "A")?;
                 self.literal(&a, !pos, depth + 1)
@@ -247,7 +221,7 @@ impl<'a> Ctx<'a> {
             }
             "$sop" => {
                 let terms = sop_terms(c)?;
-                let ins = bits(&c["connections"]["A"])?;
+                let ins = c.port("A").to_vec();
                 if terms.len() == 1 && terms[0].len() == 1 {
                     let (j, p) = terms[0][0];
                     return self.literal(&ins[j], p == pos, depth + 1);
@@ -284,8 +258,8 @@ impl<'a> Ctx<'a> {
     }
 
     /// The SOP of a fine-grained gate (`synth -noabc` / `simplemap` output) over its inputs' literals.
-    fn gate_sop(&mut self, c: &Value) -> Result<Sop, String> {
-        let t = c["type"].as_str().unwrap_or("");
+    fn gate_sop(&mut self, c: &ynet::Cell) -> Result<Sop, String> {
+        let t = c.ty.as_str();
         let mut inp = |p: &str| -> Result<Sop, String> {
             let b = conn(c, p)?;
             Ok(match self.literal(&b, true, 0)? {
@@ -322,12 +296,12 @@ impl<'a> Ctx<'a> {
     fn sop(&mut self, b: &Bit) -> Result<Sop, String> {
         if let Some((cn, _)) = self.driver.get(b).cloned() {
             let c = &self.cells[&cn];
-            if is_gate(c["type"].as_str().unwrap_or("")) && !self.owner.contains_key(b) {
+            if is_gate(&c.ty) && !self.owner.contains_key(b) {
                 return self.gate_sop(c);
             }
-            if c["type"] == "$sop" && !self.owner.contains_key(b) {
+            if c.ty == "$sop" && !self.owner.contains_key(b) {
                 let terms = sop_terms(c)?;
-                let ins = bits(&c["connections"]["A"])?;
+                let ins = c.port("A").to_vec();
                 let mut out = Sop::zero();
                 for t in terms {
                     let mut prod = vec![];
@@ -403,30 +377,28 @@ fn storage_kind(t: &str) -> Option<(Storage, bool, bool, bool)> {
 
 /// Read a Yosys JSON netlist.
 pub fn import(json: &str, top: Option<&str>) -> Result<Imported, String> {
-    let j: Value = serde_json::from_str(json).map_err(|e| format!("JSON: {e}"))?;
-    import_value(&j, top)
+    import_netlist(&Netlist::from_json(json)?, top)
 }
 
-/// [`import`] from a netlist already in memory in the Yosys JSON schema (e.g. built from RTLIL
-/// by the Yosys plugin, `atf15xx_synth::plugin`).
-pub fn import_value(j: &Value, top: Option<&str>) -> Result<Imported, String> {
-    let mods = j["modules"].as_object().ok_or("no modules")?;
+/// [`import`] from a typed netlist (from a JSON file, or built from RTLIL by the Yosys plugin,
+/// `atf15xx_synth::plugin`).
+pub fn import_netlist(n: &Netlist, top: Option<&str>) -> Result<Imported, String> {
+    let mods = &n.modules;
     let top = match top {
         Some(t) => t.to_string(),
         None => mods
             .iter()
-            .find(|(_, m)| m["attributes"]["top"].as_u64().unwrap_or(0) == 1 || m["attributes"]["top"] == "00000000000000000000000000000001")
+            .find(|(_, m)| m.attributes.get("top").and_then(Const::as_u64) == Some(1))
             .map(|(n, _)| n.clone())
             .or_else(|| mods.keys().next().cloned())
             .ok_or("no top module")?,
     };
     let m = mods.get(&top).ok_or_else(|| format!("module {top} not found"))?;
-    let empty = serde_json::Map::new();
-    let cells = m["cells"].as_object().unwrap_or(&empty);
+    let cells = &m.cells;
     let mut warnings = vec![];
     let mut cell_stats = BTreeMap::new();
     for c in cells.values() {
-        *cell_stats.entry(c["type"].as_str().unwrap_or("?").to_string()).or_insert(0) += 1;
+        *cell_stats.entry(c.ty.clone()).or_insert(0) += 1;
     }
 
     let mut ctx = Ctx {
@@ -442,11 +414,11 @@ pub fn import_value(j: &Value, top: Option<&str>) -> Result<Imported, String> {
         origins: BTreeMap::new(),
     };
     let mut init_of: BTreeMap<u64, bool> = BTreeMap::new();
-    if let Some(nn) = m["netnames"].as_object() {
-        for (name, n) in nn {
-            let hidden = n["hide_name"].as_u64().unwrap_or(0) == 1;
-            let bs = bits(&n["bits"])?;
-            if let Some(iv) = n["attributes"].get("init") {
+    {
+        for (name, n) in &m.netnames {
+            let hidden = n.hide_name == 1;
+            let bs = &n.bits;
+            if let Some(iv) = n.attributes.get("init") {
                 for (b, v) in bs.iter().zip(init_bits(iv, bs.len())) {
                     if let (Bit::Net(id), Some(v)) = (b, v) {
                         init_of.insert(*id, v);
@@ -468,17 +440,17 @@ pub fn import_value(j: &Value, top: Option<&str>) -> Result<Imported, String> {
         }
     }
     for (cn, c) in cells {
-        let dirs = c["port_directions"].as_object().ok_or("cell without port_directions")?;
+        let dirs = c.port_directions.as_ref().ok_or("cell without port_directions")?;
         for (p, d) in dirs {
             if d == "output" {
-                for b in bits(&c["connections"][p])? {
+                for b in c.port(p).iter().cloned() {
                     if matches!(b, Bit::Net(_)) {
                         ctx.driver.insert(b, (cn.clone(), p.clone()));
                     }
                 }
             }
         }
-        let t = c["type"].as_str().unwrap_or("");
+        let t = c.ty.as_str();
         if t == "$_TBUF_" {
             ctx.tbuf.insert(conn(c, "Y")?, (conn(c, "A")?, conn(c, "E")?));
         } else if !(t == "$sop" || is_gate(t) || t == "$_NOT_" || t == "$_BUF_" || storage_kind(t).is_some()) {
@@ -490,25 +462,24 @@ pub fn import_value(j: &Value, top: Option<&str>) -> Result<Imported, String> {
 
     // ports
     let mut ports = vec![];
-    let nn = m["netnames"].as_object();
-    let pmap = m["ports"].as_object().ok_or("no ports")?;
+    let pmap = m.ports.as_ref().ok_or("no ports")?;
     for (pn, p) in pmap {
-        let dir = p["direction"].as_str().unwrap_or("input").to_string();
-        let bs = bits(&p["bits"])?;
+        let dir = p.direction.clone();
+        let bs = &p.bits;
         let mut attrs = BTreeMap::new();
-        if let Some(a) = nn.and_then(|nn| nn.get(pn)).and_then(|n| n["attributes"].as_object()) {
+        if let Some(a) = m.netnames.get(pn).map(|n| &n.attributes) {
             for (k, v) in a {
                 let val = match v {
-                    Value::String(s) => {
+                    Const::Str(s) => {
                         // Yosys writes string attributes as text and bit-vector ones as 0/1 strings
                         if !s.is_empty() && s.chars().all(|c| c == '0' || c == '1') && s.len() >= 8 {
-                            param_u(v).map(|x| x.to_string()).unwrap_or_else(|_| s.clone())
+                            param_u(Some(v)).map(|x| x.to_string()).unwrap_or_else(|_| s.clone())
                         } else {
                             s.clone()
                         }
                     }
-                    Value::Number(n) => n.to_string(),
-                    _ => continue,
+                    Const::Int(n) => n.to_string(),
+                    Const::Other(_) => continue,
                 };
                 attrs.insert(k.to_ascii_lowercase(), val);
             }
@@ -523,9 +494,9 @@ pub fn import_value(j: &Value, top: Option<&str>) -> Result<Imported, String> {
         }
         // Verilog bit index: Yosys lists bits LSB first; the netname's `offset`/`upto` give the
         // declared range (`input [15:10] a` -> offset 10), so list bit k is a[offset + k]
-        let net = nn.and_then(|n| n.get(pn));
-        let offset = net.and_then(|n| n["offset"].as_i64()).unwrap_or(0);
-        let upto = net.and_then(|n| n["upto"].as_i64()).unwrap_or(0) != 0;
+        let net = m.netnames.get(pn);
+        let offset = net.map_or(0, |n| n.offset);
+        let upto = net.is_some_and(|n| n.upto != 0);
         for (i, b) in bs.iter().enumerate() {
             let idx = offset + if upto { (bs.len() - 1 - i) as i64 } else { i as i64 };
             let verilog = if bs.len() == 1 { pn.clone() } else { format!("{pn}[{idx}]") };
@@ -547,12 +518,11 @@ pub fn import_value(j: &Value, top: Option<&str>) -> Result<Imported, String> {
 
     // storage homes
     let out_ports: Vec<&PortBit> = ports.iter().filter(|p| p.dir != "input").collect();
-    let mut storage: Vec<(String, &Value, Storage, bool, bool, bool, Option<&PortBit>)> = vec![];
+    let mut storage: Vec<(String, &ynet::Cell, Storage, bool, bool, bool, Option<&PortBit>)> = vec![];
     let mut inits = BTreeMap::new();
     let mut homed: BTreeSet<String> = BTreeSet::new();
     for c in cells.values() {
-        let t = c["type"].as_str().unwrap_or("");
-        let Some((st, ce, r, s)) = storage_kind(t) else { continue };
+        let Some((st, ce, r, s)) = storage_kind(&c.ty) else { continue };
         let q = conn(c, "Q")?;
         let home = out_ports.iter().copied().find(|p| {
             !homed.contains(&p.name)
@@ -581,7 +551,7 @@ pub fn import_value(j: &Value, top: Option<&str>) -> Result<Imported, String> {
         let a = ctx.tbuf.get(&p.bit).map(|x| x.0.clone()).unwrap_or_else(|| p.bit.clone());
         if !ctx.owner.contains_key(&a) {
             if let Some((cn, _)) = ctx.driver.get(&a) {
-                if cells[cn]["type"] == "$sop" || is_gate(cells[cn]["type"].as_str().unwrap_or("")) {
+                if cells[cn].ty == "$sop" || is_gate(&cells[cn].ty) {
                     ctx.owner.insert(a, (p.name.clone(), false));
                 }
             }
@@ -612,8 +582,7 @@ pub fn import_value(j: &Value, top: Option<&str>) -> Result<Imported, String> {
         if *ce {
             cell.ce = Some(ctx.sop(&conn(c, "E")?)?);
         }
-        let t = c["type"].as_str().unwrap_or("");
-        let both = t.contains("SR");
+        let both = c.ty.contains("SR");
         if *r {
             cell.ar = Some(ctx.sop(&conn(c, "R")?)?);
         }

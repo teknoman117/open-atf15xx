@@ -192,6 +192,14 @@ is green.
 
 ## Journal
 
+* **2026-11-26** (main session) — Typed netlist IR (F9.7 item 1, task #22): `ynet.rs` (serde
+  structs for the Yosys JSON schema); the importer, `wordmap` and the flow read it, and the plugin
+  fills it straight from RTLIL (`plugin::netlist`; `-check-json` compares typed netlists). No
+  `serde_json::Value` walking of the netlist is left. Check: 34 corpus builds + 4 examples
+  byte-identical to the previous importer (`.scratch/build_all.sh`, hashes in
+  `.scratch/typed-ir/{before,after}/jeds.sha256`; the examples differ only in `Created:`), plugin
+  == CLI 34/34 with `-check-json` (`tools/yosys-plugin/check_corpus.sh`), workspace tests 46/46
+  (one new: `ynet::tests::reads_the_yosys_schema`).
 * **2026-11-25** (main session) — F8.7: SELFPROGRAMBOARD **52.6 MHz** by default (60 MCs; was
   33.3 MHz; WinCUPL + vendor 50 MHz): a capacity strategy with neither foldback signals nor
   toggles (CE functions as macrocell nodes, D flip-flops that doubling pairs), node conversion

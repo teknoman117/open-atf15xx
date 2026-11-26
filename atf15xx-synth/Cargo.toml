@@ -38,6 +38,7 @@ atf15xx-arch = { workspace = true }
 atf15xx-fit = { workspace = true }
 atf15xx-sim = { workspace = true }
 atf15xx-tool = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }

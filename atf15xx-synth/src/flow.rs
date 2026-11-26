@@ -302,12 +302,11 @@ pub fn timing_of(r: &FitResult, grade: &str) -> Result<atf15xx_sim::timing::Repo
 
 /// Netlist JSON → fitted design and outputs.
 pub fn fit_json(json_text: &str, o: &FlowOptions, cmdline: &str) -> Result<Outputs, String> {
-    let j: serde_json::Value = serde_json::from_str(json_text).map_err(|e| format!("JSON: {e}"))?;
-    fit_value(&j, o, cmdline)
+    fit_netlist(&crate::ynet::Netlist::from_json(json_text)?, o, cmdline)
 }
 
-/// [`fit_json`] from a netlist in memory (Yosys JSON schema).
-pub fn fit_value(netlist: &serde_json::Value, o: &FlowOptions, cmdline: &str) -> Result<Outputs, String> {
+/// [`fit_json`] from a typed netlist (a JSON file, or RTLIL through the Yosys plugin).
+pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &str) -> Result<Outputs, String> {
     // a word-level netlist (--map words, the plugin): lower its coarse cells first (F9.9)
     let lowered;
     let netlist = if crate::wordmap::has_coarse(netlist) {
@@ -318,7 +317,7 @@ pub fn fit_value(netlist: &serde_json::Value, o: &FlowOptions, cmdline: &str) ->
     } else {
         netlist
     };
-    let mut imp = yosys::import_value(netlist, o.top.as_deref())?;
+    let mut imp = yosys::import_netlist(netlist, o.top.as_deref())?;
     let mut warnings = std::mem::take(&mut imp.warnings);
     let ones: Vec<&String> = imp.inits.iter().filter(|(_, v)| **v).map(|(n, _)| n).collect();
     if !ones.is_empty() {
