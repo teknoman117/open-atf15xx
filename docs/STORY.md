@@ -771,3 +771,34 @@ twenty of the board's outputs had always been push-pull. With that, the project'
 - **Process note:** most of the work was done by several AI agents running in parallel (fitter,
   prjbureau, simulator, Verilog flow), coordinated from one session, with every result
   independently re-checked before being reported.
+
+## Chapter 27: Making failure fast (2026-11-26)
+
+The next question was where fits fail, and how long the fitter takes to say so. A sweep grew four
+kinds of design (accumulators, registered comparators, banks of counters, wide multiplexers) until
+they no longer fit each chip: 198 builds, which took over four hours in total, 48 of them stopped
+by a three-minute timeout. A 16-bit comparator, a design anyone might write, never finished; a
+design with 120 registers on a 32-macrocell chip took over three minutes to be told it could not
+fit.
+
+None of it was the fitter's search being clever and slow. A 6-bit comparator crashed it outright
+(a macrocell lending its product terms to a neighbour had them written without their inputs
+routed). Beyond that it was always the same family of problem: the two-level logic routines
+asked for a complement they did not need, of a function whose complement explodes. A comparator's
+less-than output has 16 products; its complement has tens of thousands, computed only to learn that
+it was not the cheaper polarity. The cube-merging routine was cubic in the cover size; one estimate
+was recomputed seven times per strategy; a check spent 21 seconds computing covers for nodes no
+foldback ever read. Each fix kept the answer identical (the old routine stayed as the reference of
+a randomized test, or the new one only ran where the old one had gone pathological), and every
+change was held against the same checks: 12,624 vendor-fitted designs fuse for fuse, the corpus
+and the examples byte for byte, and the user's SELFPROGRAMBOARD on the ATF1504AS as the reference
+design, still 60 macrocells at 52.6 MHz.
+
+Designs that cannot fit now say so in a fiftieth of a second when the reason is plain (more
+registers than macrocells, more signals than pins). The sweep dropped from 15,537 to about 3,700
+seconds with no timeouts; the 16-bit comparator fits in five seconds; SELFPROGRAMBOARD, which
+took 14 seconds to build from Verilog in the morning, takes 3. Along the way the fitter's
+1,165-line central function became six passes, and the code base got its first `cargo fmt`. What
+remains is the fitter's routing repair loop, which refits a whole attempt each time a block's
+inputs cannot be matched; the partitioning literature (pin-constrained FM, replication) points at
+checking that matching inside the partitioner instead.
