@@ -150,13 +150,14 @@ Plans: spec F9.5 (roadmap), F9.6/F9.7 (Yosys plugin), `docs/plan/open-source.md`
 contributions, repo split, OpenOCD driver, crate audit). Done since the roadmap (R1–R6, F9.5):
 position-aware placement, STA and `--fmax`, XOR synthesis, packing P1/P3, word-level mapping and
 `--map auto` (F9.9), timing targets (F8.7), the exact placement bound (F4.6c), path independence of
-the CLI (F9.7), the typed netlist IR (F9.7 item 1), programming over JTAG.
+the CLI (F9.7), the typed netlist IR (F9.7 item 1), typed fit errors (F9.9), programming over JTAG.
 
 1. **Synthesis structure for dense designs**: SELFPROGRAMBOARD now 52.6 MHz from Verilog vs 55.6
    MHz from CUPL's netlist (F8.7, F9.10).
 2. **Mapping–placement loop in the plugin** (F9.7 item 3): re-run Yosys passes on an overflowing
-   block's logic between fit attempts. Needs typed fit errors first (F9.9: `FitError` kinds
-   instead of string matching).
+   block's logic between fit attempts. Its prerequisites are in place (typed netlist IR, typed fit
+   errors `FitErrorKind`, both 2026-11-26); next is choosing what to re-map on a `Routing` /
+   `Capacity` failure (F9.9 item 2: cost queries such as block fan-in and PT demand).
 3. **Canonical cell order** for the plugin: results there still depend on the path a source was
    read by (Yosys orders cells by path-carrying names, F9.7); the CLI avoids it by reading
    relative paths.
