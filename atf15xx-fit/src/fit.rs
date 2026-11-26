@@ -966,10 +966,7 @@ fn place_cells(
                     if cell_mcs.contains(&m) || reserved_mcs.contains(&m) || !helpers_free(m, d, &place_of, &reserved_mcs, &share) {
                         continue;
                     }
-                    let mut lim = 0;
-                    while !fanin_ok(design, &place_of, (m - 1) / 16, c, lim) {
-                        lim += 1;
-                    }
+                    let lim = fanin_count(design, &place_of, (m - 1) / 16, c);
                     if best.map_or(true, |(l, _)| lim < l) {
                         best = Some((lim, m));
                     }
@@ -2213,6 +2210,11 @@ fn reserve_helpers(mc: u16, demand: usize, reserved: &mut BTreeSet<u16>) {
 
 /// Would placing `c` in block `b` keep the block's distinct inputs within `limit`?
 fn fanin_ok(design: &Design, place_of: &BTreeMap<String, Place>, b: u16, c: &Cell, limit: usize) -> bool {
+    fanin_count(design, place_of, b, c) <= limit
+}
+
+/// Distinct UIM inputs block `b` would need with `c` added to the cells placed there.
+fn fanin_count(design: &Design, place_of: &BTreeMap<String, Place>, b: u16, c: &Cell) -> usize {
     // the union of interned input ids in a reusable bitset (spec F9.11: this check runs for
     // every candidate macrocell, and rebuilding string sets dominated the fitter's profile)
     let mut ids: Vec<std::rc::Rc<[u32]>> = vec![uim_ids(design, c)];
@@ -2239,13 +2241,13 @@ fn fanin_ok(design: &Design, place_of: &BTreeMap<String, Place>, b: u16, c: &Cel
                 }
             }
         }
-        count <= limit
+        count
     })
 }
 
-// Memoised UIM inputs as interned ids (spec F9.11), cleared at every fit attempt (the netlist's
-// foldbacks can change between designs). Keyed by the cell's name and a hash of its functions,
-// so a cell rewritten during an attempt (a hosted T flip-flop becoming D + CE) gets a new entry.
+// Memoised UIM inputs as interned ids (spec F9.11), per cell name, cleared at every fit attempt
+// (the netlist's foldbacks can change between designs) and after a hosted T flip-flop becomes
+// D + CE during placement (the only change to cells within an attempt).
 #[derive(Default)]
 struct UimMemo {
     /// per cell name; valid while the cells do not change (cleared at every attempt and after

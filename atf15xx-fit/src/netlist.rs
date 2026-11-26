@@ -60,11 +60,17 @@ impl Cell {
     }
     /// All signals this cell's product terms read.
     pub fn inputs(&self) -> Vec<Signal> {
-        let mut v = self.data.signals();
-        for s in [&self.clk, &self.ce, &self.ar, &self.ap, &self.oe].into_iter().flatten() {
-            v.extend(s.signals());
-        }
-        v.sort();
+        self.input_refs().into_iter().cloned().collect()
+    }
+    /// [`Cell::inputs`] without cloning: the distinct signals of all its functions, sorted.
+    pub fn input_refs(&self) -> Vec<&Signal> {
+        let mut v: Vec<&Signal> =
+            [Some(&self.data), self.clk.as_ref(), self.ce.as_ref(), self.ar.as_ref(), self.ap.as_ref(), self.oe.as_ref()]
+                .into_iter()
+                .flatten()
+                .flat_map(|f| f.0.iter().flatten().map(|(s, _)| s))
+                .collect();
+        v.sort_unstable();
         v.dedup();
         v
     }
@@ -107,7 +113,7 @@ impl Design {
     pub fn find_xor_splits(&mut self, pattern: bool, general: bool) {
         let mut out = BTreeMap::new();
         for c in &self.cells {
-            if c.data.is_zero() || c.data.is_one() || c.data.signals().iter().any(|s| matches!(s, Signal::Fold(_))) {
+            if c.data.is_zero() || c.data.is_one() || c.data.0.iter().flatten().any(|(s, _)| matches!(s, Signal::Fold(_))) {
                 continue;
             }
             if let Some(x) = two_literal_xor(&c.data).filter(|_| pattern) {
@@ -119,38 +125,7 @@ impl Design {
             if !general || c.data.support() > 12 {
                 continue;
             }
-            let f = &c.data;
-            let fbar = f.complement();
-            let target_len = |x: &XorSplit| if c.active_low { x.gbar.0.len() } else { x.g.0.len() };
-            let plain = f.0.len().min(fbar.0.len().max(1));
-            if plain < 3 {
-                continue;
-            }
-            let mut cands: Vec<Vec<(Signal, bool)>> = vec![];
-            for s in f.signals() {
-                cands.push(vec![(s.clone(), true)]);
-            }
-            for p in f.0.iter().chain(fbar.0.iter()).take(24) {
-                if p.len() > 1 && !cands.contains(p) {
-                    cands.push(p.clone());
-                }
-            }
-            let mut best: Option<(usize, XorSplit)> = None;
-            for p in cands {
-                let ps = Sop(vec![p.clone()]);
-                let pbar = ps.complement();
-                let g = f.and(&pbar).or(&fbar.and(&ps)).minimize();
-                if g.is_zero() || g.is_one() {
-                    continue;
-                }
-                let gbar = g.complement();
-                let x = XorSplit { p, g, gbar };
-                let cost = 1 + target_len(&x);
-                if cost < plain && best.as_ref().map_or(true, |(b, _)| cost < *b) {
-                    best = Some((cost, x));
-                }
-            }
-            if let Some((_, x)) = best {
+            if let Some(x) = general_xor_split(&c.data, c.active_low) {
                 out.insert(c.name.clone(), x);
             }
         }
@@ -647,6 +622,61 @@ impl Design {
             }
         }
     }
+}
+
+/// The general XOR decomposition search of [`Design::find_xor_splits`] for one cover (spec F4.6b),
+/// memoised per thread: it depends only on the cover and the cell's polarity, and every strategy's
+/// `fit_design` runs it again on the same cells.
+fn general_xor_split(data: &Sop, active_low: bool) -> Option<XorSplit> {
+    thread_local! {
+        static SPLITS: std::cell::RefCell<rustc_hash::FxHashMap<(Sop, bool), Option<XorSplit>>> = Default::default();
+    }
+    let key = (data.clone(), active_low);
+    if let Some(r) = SPLITS.with(|m| m.borrow().get(&key).cloned()) {
+        return r;
+    }
+    let r = (|| {
+        let f = data;
+        let fbar = f.complement();
+        let target_len = |x: &XorSplit| if active_low { x.gbar.0.len() } else { x.g.0.len() };
+        let plain = f.0.len().min(fbar.0.len().max(1));
+        if plain < 3 {
+            return None;
+        }
+        let mut cands: Vec<Vec<(Signal, bool)>> = vec![];
+        for s in f.signals() {
+            cands.push(vec![(s.clone(), true)]);
+        }
+        for p in f.0.iter().chain(fbar.0.iter()).take(24) {
+            if p.len() > 1 && !cands.contains(p) {
+                cands.push(p.clone());
+            }
+        }
+        let mut best: Option<(usize, XorSplit)> = None;
+        for p in cands {
+            let ps = Sop(vec![p.clone()]);
+            let pbar = ps.complement();
+            let g = f.and(&pbar).or(&fbar.and(&ps)).minimize();
+            if g.is_zero() || g.is_one() {
+                continue;
+            }
+            let gbar = g.complement();
+            let x = XorSplit { p, g, gbar };
+            let cost = 1 + target_len(&x);
+            if cost < plain && best.as_ref().map_or(true, |(b, _)| cost < *b) {
+                best = Some((cost, x));
+            }
+        }
+        best.map(|(_, x)| x)
+    })();
+    SPLITS.with(|m| {
+        let mut m = m.borrow_mut();
+        if m.len() > 1 << 14 {
+            m.clear();
+        }
+        m.insert(key, r.clone());
+    });
+    r
 }
 
 /// `f` = XOR/XNOR of two literals (two products of the same two signals, both literals

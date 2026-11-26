@@ -82,8 +82,13 @@ impl Sop {
         }
     }
     pub fn signals(&self) -> Vec<Signal> {
-        let mut v: Vec<Signal> = self.0.iter().flatten().map(|(s, _)| s.clone()).collect();
-        v.sort();
+        // sorted and deduplicated by reference: only the distinct signals are cloned
+        self.signal_refs().into_iter().cloned().collect()
+    }
+    /// [`Sop::signals`] without cloning: the distinct signals, sorted.
+    pub fn signal_refs(&self) -> Vec<&Signal> {
+        let mut v: Vec<&Signal> = self.0.iter().flatten().map(|(s, _)| s).collect();
+        v.sort_unstable();
         v.dedup();
         v
     }
@@ -208,7 +213,7 @@ impl Sop {
 
     /// Number of variables in the support.
     pub fn support(&self) -> usize {
-        self.signals().len()
+        self.signal_refs().len()
     }
 
     fn encode(&self) -> (Vec<Signal>, Option<Vec<Cube>>) {

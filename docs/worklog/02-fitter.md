@@ -107,6 +107,18 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — Clone pass (user: "ensure we're not widely using borrow checker appeasement in
+  ways that slows our execution"), batch 1, by profile (SELFPROGRAMBOARD, frame-pointer build):
+  `Sop::signals` / `Cell::inputs` cloned every literal's `Signal` (a heap `String`) before
+  deduplicating; now they sort references (`signal_refs`, `input_refs`) and clone only the
+  distinct signals, and `support()` clones nothing. `fanin_count` replaces the "how far over
+  budget" loop that called `fanin_ok` with limits 0, 1, 2, ... (one union instead of one per
+  step). The general XOR-split search is memoised (`general_xor_split`, pure in the cover and the
+  polarity; it ran again in every strategy's `fit_design`). SELFPROGRAMBOARD fit 1.98 → 1.46 s
+  (Verilog build 3 s, was 14 s this morning); 18-bit compare 43 → 34 s. Checks: vendor identity
+  unchanged, corpus and examples byte-identical, SELFPROGRAMBOARD unchanged, tests 48/48, clippy
+  count unchanged. Edge sweep (`edge-v3.json`, before this batch): 3,712 s for 198 builds (first
+  sweep 15,537 s), failures median 0.2 s, 90 % 48 s, max 137 s; fits median 15.5 s.
 * **2026-11-26** — Time to failure, continued (18-bit registered compare, ATF1504AS-TQFP100,
   one thread 74 → 50 s, same fit 60/64): (1) `Design::collapse_comb_nodes`: the foldback check of
   every candidate node computed both its covers even when no foldback product reads the node (then
