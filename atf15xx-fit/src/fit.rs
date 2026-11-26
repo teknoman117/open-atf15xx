@@ -796,6 +796,8 @@ fn place_cells(
                     r.storage = Storage::Dff;
                 }
             }
+            // the converted cells' inputs changed: the UIM input lists are rebuilt from here
+            uim_memo_clear();
         }
         if std::env::var_os("ATF_FIT_DEBUG").is_some() {
             for (i, c) in design.cells.iter().enumerate() {
@@ -2246,7 +2248,9 @@ fn fanin_ok(design: &Design, place_of: &BTreeMap<String, Place>, b: u16, c: &Cel
 // so a cell rewritten during an attempt (a hosted T flip-flop becoming D + CE) gets a new entry.
 #[derive(Default)]
 struct UimMemo {
-    lists: rustc_hash::FxHashMap<(String, u64), std::rc::Rc<[u32]>>,
+    /// per cell name; valid while the cells do not change (cleared at every attempt and after
+    /// placement's one change to cells, the hosted T flip-flops' conversion)
+    lists: rustc_hash::FxHashMap<String, std::rc::Rc<[u32]>>,
     intern: rustc_hash::FxHashMap<Signal, u32>,
     bits: Vec<u64>,
 }
@@ -2263,11 +2267,7 @@ fn uim_memo_clear() {
 }
 
 fn uim_ids(design: &Design, c: &Cell) -> std::rc::Rc<[u32]> {
-    use std::hash::{Hash, Hasher};
-    let mut h = rustc_hash::FxHasher::default();
-    (&c.data, &c.clk, &c.ce, &c.ar, &c.ap, &c.oe).hash(&mut h);
-    let key = (c.name.clone(), h.finish());
-    if let Some(l) = UIM_MEMO.with(|m| m.borrow().lists.get(&key).cloned()) {
+    if let Some(l) = UIM_MEMO.with(|m| m.borrow().lists.get(c.name.as_str()).cloned()) {
         return l;
     }
     let sigs = uim_inputs(design, c);
@@ -2281,7 +2281,7 @@ fn uim_ids(design: &Design, c: &Cell) -> std::rc::Rc<[u32]> {
             })
             .collect();
         let l: std::rc::Rc<[u32]> = ids.into();
-        m.lists.insert(key, l.clone());
+        m.lists.insert(c.name.clone(), l.clone());
         l
     })
 }
