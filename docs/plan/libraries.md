@@ -20,7 +20,7 @@ the last 90 days).
 | `splr` (pure-Rust SAT) | 0.19.0, MPL-2.0 | 2026-08 | 4 k | as above without C | candidate |
 | `varisat` (pure-Rust SAT) | 0.2.2, MIT/Apache | 2020-09 | 382 k | unmaintained since 2020 | no |
 | `metis` (METIS bindings) | 0.2.2, MIT/Apache | 2024-10 | 129 k | graph partitioning baseline for the block assignment | candidate |
-| `mt-kahypar` (bindings) | 0.2.0, MIT/Apache | 2025-06 | 376 | hypergraph partitioning (the right model for block fan-in), but bindings barely used | watch |
+| `mt-kahypar` (bindings) | 0.2.0, MIT/Apache | 2025-06 | 376 | hypergraph partitioning (the right model for block fan-in), but bindings barely used; assessed 2026-11-26 in `docs/plan/partitioning.md`: not as a dependency (≤ 128 vertices, km1 is a sum not our per-block bound, no UIM matching), at most a test oracle | watch |
 | `egg` / `egglog` (e-graphs) | 0.11.0 / 3.0.0, MIT | 2025-12 / 2026-08 | 1.2 M / 59 k | exploring rewrites (De Morgan, factoring, XOR splits) under a macrocell cost | experimental |
 | ABC (in Yosys: `yosys-abc`) | (Yosys 0.71) | | | cover-size oracle (`strash; collapse; sop` on BLIF/AIGER), `cec`/`dprove` already used | oracle (planned) |
 | mockturtle (EPFL, C++ header-only) | | | | XOR-aware rewriting (XAGs, ESOP): our weak spot. No Rust bindings; through `cxx` like the Yosys bridge | candidate |

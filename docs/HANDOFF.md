@@ -154,21 +154,23 @@ the CLI (F9.7), the typed netlist IR (F9.7 item 1), typed fit errors (F9.9), pro
 
 1. **Synthesis structure for dense designs**: SELFPROGRAMBOARD now 52.6 MHz from Verilog vs 55.6
    MHz from CUPL's netlist (F8.7, F9.10).
-2. **Mapping–placement loop in the plugin** (F9.7 item 3): re-run Yosys passes on an overflowing
+2. **UIM matching in the partitioner's cost, then replication moves** (`docs/plan/partitioning.md`,
+   2026-11-26): the remaining time sink is the UIM repair loop refitting whole attempts.
+3. **Mapping–placement loop in the plugin** (F9.7 item 3): re-run Yosys passes on an overflowing
    block's logic between fit attempts. Its prerequisites are in place (typed netlist IR, typed fit
    errors `FitErrorKind`, both 2026-11-26); next is choosing what to re-map on a `Routing` /
    `Capacity` failure (F9.9 item 2: cost queries such as block fan-in and PT demand).
-3. **Canonical cell order** for the plugin: results there still depend on the path a source was
+4. **Canonical cell order** for the plugin: results there still depend on the path a source was
    read by (Yosys orders cells by path-carrying names, F9.7); the CLI avoids it by reading
    relative paths.
-4. **Crate hygiene** (plan §5): `jedec` crate for reading (verified identical on 134 JEDs),
+5. **Crate hygiene** (plan §5): `jedec` crate for reading (verified identical on 134 JEDs),
    `bitvec`, `thiserror`, an `svf` parser in tests.
-5. **XOR extension**: use a cascade lender's own PT2 output (`x = PT2 ⊕ Invert`, F2.8) as a
+6. **XOR extension**: use a cascade lender's own PT2 output (`x = PT2 ⊕ Invert`, F2.8) as a
    packing gain.
-6. **Coarse-level mapping** through the plugin (F9.3 B + C).
-7. Upstream: prjbureau contributions (1508 database, BE programming, silicon facts), OpenOCD
+7. **Coarse-level mapping** through the plugin (F9.3 B + C).
+8. Upstream: prjbureau contributions (1508 database, BE programming, silicon facts), OpenOCD
    `atf15xx` PLD driver — each only with the user's go-ahead.
-8. Silicon still to do: cold power-up, slow vs fast slew, 1502AS GOE invert bits.
+9. Silicon still to do: cold power-up, slow vs fast slew, 1502AS GOE invert bits.
 
 ## 9. Quick checks
 
