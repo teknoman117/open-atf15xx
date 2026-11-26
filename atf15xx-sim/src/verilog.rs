@@ -62,7 +62,8 @@ pub fn emit(m: &Model, o: &EmitOptions) -> String {
         m.opts.cascade_requires_pts, m.opts.lender_a_is_one, m.opts.idle_mc_holds, m.opts.oe_pt5_needs_mux
     )
     .unwrap();
-    writeln!(v, "// JTAG port {}; pins: {}", if m.decoded.jtag { "enabled (JTAG pins omitted)" } else { "disabled" }, m.pins.len()).unwrap();
+    writeln!(v, "// JTAG port {}; pins: {}", if m.decoded.jtag { "enabled (JTAG pins omitted)" } else { "disabled" }, m.pins.len())
+        .unwrap();
     let mut ports = vec![];
     for &(p, k) in &m.pins {
         ports.push(format!("input wire p{p}_in"));

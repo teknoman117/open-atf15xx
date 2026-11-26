@@ -303,9 +303,7 @@ pub fn decode(f: Family, fuses: &[bool]) -> Decoded {
         });
     }
     let w = f.uim_width();
-    let sel = |a: usize, choices: &[Source]| -> Option<Source> {
-        (0..w).find(|&i| !fuses[a + i]).map(|i| choices[i])
-    };
+    let sel = |a: usize, choices: &[Source]| -> Option<Source> { (0..w).find(|&i| !fuses[a + i]).map(|i| choices[i]) };
     let uim = (0..f.blocks()).map(|b| (0..40).map(|m| sel(f.uim_addr(b, m), f.uim_choices(m))).collect()).collect();
     let mut goe = [(None, false); 6];
     for n in 1..=6 {

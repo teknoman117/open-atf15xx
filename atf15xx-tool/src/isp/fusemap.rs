@@ -15,15 +15,7 @@ pub struct AsBlock {
 }
 
 const fn asb(r0: usize, r1: usize, c0: usize, c1: usize, base: i64, rs: i64, cs: i64) -> AsBlock {
-    AsBlock {
-        r0,
-        r1,
-        c0,
-        c1,
-        base,
-        rs,
-        cs,
-    }
+    AsBlock { r0, r1, c0, c1, base, rs, cs }
 }
 
 /// §5.2.1–§5.2.3 (the "15439 + 80·r − c" forms are written with r0/c0 = 0).
@@ -62,26 +54,10 @@ pub struct BeSeg {
 const LIN: [i64; 8] = [7, 6, 5, 4, 3, 2, 1, 0];
 const G96: [i64; 8] = [672, 576, 480, 384, 288, 192, 96, 0];
 const fn seg(r0: usize, r1: usize, base: i64, g: usize, rstride: i64, t: [i64; 8]) -> BeSeg {
-    BeSeg {
-        r0,
-        r1,
-        base,
-        g,
-        rstride,
-        t,
-        explicit: None,
-    }
+    BeSeg { r0, r1, base, g, rstride, t, explicit: None }
 }
 const fn cells(r: usize, c: [i64; 8]) -> BeSeg {
-    BeSeg {
-        r0: r,
-        r1: r,
-        base: 0,
-        g: 0,
-        rstride: 0,
-        t: [0; 8],
-        explicit: Some(c),
-    }
+    BeSeg { r0: r, r1: r, base: 0, g: 0, rstride: 0, t: [0; 8], explicit: Some(c) }
 }
 
 pub const BE_1502: &[BeSeg] = &[
@@ -90,10 +66,7 @@ pub const BE_1502: &[BeSeg] = &[
     seg(108, 1067, 0, 10, 768, G96),
     seg(1068, 1117, 16320, 10, 40, [35, 30, 25, 20, 15, 10, 5, 0]),
     seg(1118, 2077, 7680, 10, 768, G96),
-    cells(
-        2078,
-        [16745, 16740, 16735, 16730, 16725, 16720, 16720, 16724],
-    ),
+    cells(2078, [16745, 16740, 16735, 16730, 16725, 16720, 16720, 16724]),
     seg(2079, 2082, 16721, 0, 1, [25, 20, 15, 10, 5, 0, 0, 0]),
     seg(2083, 2089, 16750, 0, 8, LIN),
 ];
@@ -108,10 +81,7 @@ pub const BE_1504: &[BeSeg] = &[
     seg(2226, 3185, 7680, 10, 768, G96),
     seg(3186, 3275, 33360, 10, 72, [63, 54, 45, 36, 27, 18, 9, 0]),
     seg(3276, 4235, 23040, 10, 768, G96),
-    cells(
-        4236,
-        [34125, 34116, 34107, 34098, 34089, 34080, 34080, 34088],
-    ),
+    cells(4236, [34125, 34116, 34107, 34098, 34089, 34080, 34080, 34088]),
     seg(4237, 4244, 34081, 0, 1, [45, 36, 27, 18, 9, 0, 0, 0]),
     seg(4245, 4251, 34134, 0, 8, LIN),
 ];
@@ -138,10 +108,7 @@ pub const BE_1508: &[BeSeg] = &[
     seg(7002, 7961, 53760, 10, 768, G96),
     seg(7962, 8231, 69627, 10, 216, T216B),
     seg(8232, 9191, 46080, 10, 768, G96),
-    cells(
-        9192,
-        [74055, 74028, 74001, 73974, 73947, 73920, 73920, 73946],
-    ),
+    cells(9192, [74055, 74028, 74001, 73974, 73947, 73920, 73920, 73946]),
     seg(9193, 9218, 73921, 0, 1, [135, 108, 81, 54, 27, 0, 0, 0]),
     seg(9219, 9225, 74082, 0, 8, LIN),
 ];
@@ -202,13 +169,7 @@ impl FuseMap {
                 }
             }
         }
-        FuseMap {
-            family,
-            rows,
-            special,
-            ues,
-            config,
-        }
+        FuseMap { family, rows, special, ues, config }
     }
 }
 
@@ -238,11 +199,7 @@ impl DeviceImage {
     pub fn from_fuses(map: &FuseMap, fuses: &[u8]) -> DeviceImage {
         let pick = |i: i64| if i < 0 { b'1' } else { fuses[i as usize] };
         DeviceImage {
-            rows: map
-                .rows
-                .iter()
-                .map(|row| row.iter().map(|&i| pick(i)).collect())
-                .collect(),
+            rows: map.rows.iter().map(|row| row.iter().map(|&i| pick(i)).collect()).collect(),
             special: map.special.iter().map(|&i| pick(i)).collect(),
             ues: map.ues.iter().map(|&i| pick(i)).collect(),
             config: map.config.iter().map(|&i| pick(i)).collect(),
@@ -280,29 +237,14 @@ mod tests {
     fn tables_match_specification() {
         let doc = include_str!("../../../docs/architecture/05-fuse-maps.md");
         let mut sections = doc.split("\n### ").skip(1);
-        let expect_as = [
-            ("1502AS", AS_1502),
-            ("1504AS", AS_1504),
-            ("1508AS", AS_1508),
-        ];
-        let expect_be = [
-            ("1502BE", BE_1502),
-            ("1504BE", BE_1504),
-            ("1508BE", BE_1508),
-        ];
+        let expect_as = [("1502AS", AS_1502), ("1504AS", AS_1504), ("1508AS", AS_1508)];
+        let expect_be = [("1502BE", BE_1502), ("1504BE", BE_1504), ("1508BE", BE_1508)];
         let mut found = 0;
         for sec in sections.by_ref() {
             let title = sec.lines().next().unwrap_or("");
-            let lines: Vec<&str> = sec
-                .lines()
-                .filter(|l| {
-                    l.starts_with("| ") && !l.starts_with("| Rows") && !l.starts_with("|---")
-                })
-                .collect();
-            if let Some((_, tab)) = expect_as
-                .iter()
-                .find(|(n, _)| title.contains(&format!(" {n} ")))
-            {
+            let lines: Vec<&str> =
+                sec.lines().filter(|l| l.starts_with("| ") && !l.starts_with("| Rows") && !l.starts_with("|---")).collect();
+            if let Some((_, tab)) = expect_as.iter().find(|(n, _)| title.contains(&format!(" {n} "))) {
                 assert_eq!(lines.len(), tab.len(), "{title}");
                 for (l, b) in lines.iter().zip(tab.iter()) {
                     let cells: Vec<&str> = l.trim_matches('|').split('|').map(str::trim).collect();
@@ -311,46 +253,24 @@ mod tests {
                     // evaluate the documented expression at the block corners
                     for (r, c) in [(b.r0, b.c0), (b.r1, b.c1), (b.r0, b.c1), (b.r1, b.c0)] {
                         let want = b.base + b.rs * (r - b.r0) as i64 + b.cs * (c - b.c0) as i64;
-                        assert_eq!(
-                            eval_expr(cells[2].trim_matches('`'), r as i64, c as i64),
-                            want,
-                            "{l}"
-                        );
+                        assert_eq!(eval_expr(cells[2].trim_matches('`'), r as i64, c as i64), want, "{l}");
                     }
                 }
                 found += 1;
-            } else if let Some((_, tab)) = expect_be
-                .iter()
-                .find(|(n, _)| title.contains(&format!(" {n} ")))
-            {
+            } else if let Some((_, tab)) = expect_be.iter().find(|(n, _)| title.contains(&format!(" {n} "))) {
                 assert_eq!(lines.len(), tab.len(), "{title}");
                 for (l, s) in lines.iter().zip(tab.iter()) {
                     let cells: Vec<&str> = l.trim_matches('|').split('|').map(str::trim).collect();
                     if let Some(ex) = s.explicit {
                         assert_eq!(cells[0], s.r0.to_string());
-                        let want = ex
-                            .iter()
-                            .map(|v| v.to_string())
-                            .collect::<Vec<_>>()
-                            .join(" ");
+                        let want = ex.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" ");
                         assert!(cells[4].contains(&want), "{l}");
                     } else {
                         assert_eq!(cells[0], format!("{}–{}", s.r0, s.r1));
                         assert_eq!(cells[1], s.base.to_string());
-                        assert_eq!(
-                            cells[2],
-                            if s.g == 0 {
-                                "∞".to_string()
-                            } else {
-                                s.g.to_string()
-                            }
-                        );
+                        assert_eq!(cells[2], if s.g == 0 { "∞".to_string() } else { s.g.to_string() });
                         assert_eq!(cells[3], s.rstride.to_string());
-                        let t =
-                            s.t.iter()
-                                .map(|v| v.to_string())
-                                .collect::<Vec<_>>()
-                                .join(" ");
+                        let t = s.t.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" ");
                         assert_eq!(cells[4].trim_matches('`'), t);
                     }
                 }

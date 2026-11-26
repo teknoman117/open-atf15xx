@@ -24,8 +24,12 @@ enum Preassign {
 /// Fit a CUPL `.tt2` netlist for an ATF1502AS, ATF1504AS or ATF1508AS (the family comes from the
 /// device). Writes <OUTPUT>.jed, .fit, .pin and .map.json.
 #[derive(Parser)]
-#[command(name = "atf15xx-fit", version, after_help = "Every vendor strategy is also available as --set KEY=VALUE (e.g. --set cascade_logic=off, \
---set gck_itd=gck0, --set mc_power=on); the defaults are the vendor fitters'. fit1502/fit1504/fit1508 take the vendor's own command line.")]
+#[command(
+    name = "atf15xx-fit",
+    version,
+    after_help = "Every vendor strategy is also available as --set KEY=VALUE (e.g. --set cascade_logic=off, \
+--set gck_itd=gck0, --set mc_power=on); the defaults are the vendor fitters'. fit1502/fit1504/fit1508 take the vendor's own command line."
+)]
 struct Cli {
     /// The netlist (.tt2)
     design: PathBuf,
@@ -83,11 +87,15 @@ fn run(cli: Cli) -> Result<(), String> {
             Err(format!("unknown option {k} (see the vendor strategies in atf15xx-fit/README.md)"))
         }
     };
-    set(&mut opts, "preassign", match cli.preassign {
-        Preassign::Try => "try",
-        Preassign::Keep => "keep",
-        Preassign::Ignore => "ignore",
-    })?;
+    set(
+        &mut opts,
+        "preassign",
+        match cli.preassign {
+            Preassign::Try => "try",
+            Preassign::Keep => "keep",
+            Preassign::Ignore => "ignore",
+        },
+    )?;
     if cli.no_jtag {
         set(&mut opts, "jtag", "off")?;
     }

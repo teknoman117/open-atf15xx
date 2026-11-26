@@ -24,7 +24,15 @@ pub fn device_lines(d: &Device) -> String {
     for (p, m) in d.input_only_pins() {
         writeln!(o, "input {p} {m}").unwrap();
     }
-    for (k, v) in [("gclk1", d.gclk1), ("oe1", d.oe1), ("gclr", d.gclr), ("gclk2_oe2", d.gclk2_oe2), ("gclk3", d.gclk3), ("pd1", d.pd1), ("pd2", d.pd2)] {
+    for (k, v) in [
+        ("gclk1", d.gclk1),
+        ("oe1", d.oe1),
+        ("gclr", d.gclr),
+        ("gclk2_oe2", d.gclk2_oe2),
+        ("gclk3", d.gclk3),
+        ("pd1", d.pd1),
+        ("pd2", d.pd2),
+    ] {
         writeln!(o, "{k} {v}").unwrap();
     }
     writeln!(o, "jtag {} {} {} {}", d.jtag.tdi, d.jtag.tms, d.jtag.tck, d.jtag.tdo).unwrap();

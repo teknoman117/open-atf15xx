@@ -213,8 +213,7 @@ impl Design {
         let ins: Vec<Signal> = p.inputs.iter().map(|l| sig_of(l)).collect();
         let mut funcs: Vec<Sop> = vec![Sop::zero(); p.outputs.len()];
         for (cube, outs) in &p.cubes {
-            let prod: Vec<(Signal, bool)> =
-                cube.iter().enumerate().filter_map(|(i, v)| v.map(|v| (ins[i].clone(), v))).collect();
+            let prod: Vec<(Signal, bool)> = cube.iter().enumerate().filter_map(|(i, v)| v.map(|v| (ins[i].clone(), v))).collect();
             for &o in outs {
                 funcs[o].push(prod.clone());
             }
@@ -258,7 +257,14 @@ impl Design {
         let subst: Vec<(String, Sop)> = d
             .cells
             .iter()
-            .filter(|c| c.is_output && c.storage == Storage::Comb && c.oe.is_none() && !c.active_low && c.data.0.len() == 1 && c.data.0[0].len() == 1)
+            .filter(|c| {
+                c.is_output
+                    && c.storage == Storage::Comb
+                    && c.oe.is_none()
+                    && !c.active_low
+                    && c.data.0.len() == 1
+                    && c.data.0[0].len() == 1
+            })
             .map(|c| (c.name.clone(), c.data.clone()))
             .collect();
         for (n, f) in subst {
@@ -359,7 +365,8 @@ impl Design {
     /// levels (2·tSEXP). With `one_level`, nodes that some reader uses positively, or whose
     /// products already read foldbacks, stay macrocell nodes (one UIM pass, tUIM + tLAD + tCOMB).
     pub fn nodes_to_foldbacks_with(&mut self, max_products: usize, one_level: bool) -> usize {
-        let key_of = |p: &[(Signal, bool)]| p.iter().map(|(s, v)| format!("{}{}", if *v { "" } else { "!" }, s)).collect::<Vec<_>>().join("&");
+        let key_of =
+            |p: &[(Signal, bool)]| p.iter().map(|(s, v)| format!("{}{}", if *v { "" } else { "!" }, s)).collect::<Vec<_>>().join("&");
         let mut n = 0;
         loop {
             let pick = self.cells.iter().position(|c| {
@@ -367,7 +374,10 @@ impl Design {
                     return false;
                 }
                 let m = c.data.minimize();
-                if m.0.len() < 2 || m.0.len() > max_products || m.0.iter().any(|p| p.iter().any(|(s, v)| !v && matches!(s, Signal::Fold(_)))) {
+                if m.0.len() < 2
+                    || m.0.len() > max_products
+                    || m.0.iter().any(|p| p.iter().any(|(s, v)| !v && matches!(s, Signal::Fold(_))))
+                {
                     return false;
                 }
                 let s = Signal::Fb(c.name.clone(), false);
@@ -386,27 +396,24 @@ impl Design {
                         return false;
                     }
                 }
-                self.cells.iter().any(|o| {
-                    [&o.clk, &o.ce, &o.ar, &o.ap, &o.oe].into_iter().flatten().any(|f| f.signals().contains(&s))
-                })
+                self.cells.iter().any(|o| [&o.clk, &o.ce, &o.ar, &o.ap, &o.oe].into_iter().flatten().any(|f| f.signals().contains(&s)))
             });
             let Some(i) = pick else { return n };
             let c = self.cells.remove(i);
             let m = c.data.minimize();
             // !p for each product: a foldback, or for a single literal simply its complement
             // (both polarities of every signal come from the UIM)
-            let inner: Vec<(Signal, bool)> = m
-                .0
-                .iter()
-                .map(|p| match p.as_slice() {
-                    [(s, v)] if !matches!(s, Signal::Fold(_)) => (s.clone(), !v),
-                    _ => {
-                        let k = key_of(p);
-                        self.folds.insert(k.clone(), p.clone());
-                        (Signal::Fold(k), true)
-                    }
-                })
-                .collect();
+            let inner: Vec<(Signal, bool)> =
+                m.0.iter()
+                    .map(|p| match p.as_slice() {
+                        [(s, v)] if !matches!(s, Signal::Fold(_)) => (s.clone(), !v),
+                        _ => {
+                            let k = key_of(p);
+                            self.folds.insert(k.clone(), p.clone());
+                            (Signal::Fold(k), true)
+                        }
+                    })
+                    .collect();
             let outer = format!("nand({})", inner.iter().map(|(s, _)| s.to_string()).collect::<Vec<_>>().join(","));
             self.folds.insert(outer.clone(), inner.clone());
             let s = Signal::Fb(c.name.clone(), false);
@@ -435,7 +442,9 @@ impl Design {
             let pos = Sop(vec![vec![(Signal::Fold(outer), true)]]);
             let neg = Sop(vec![inner]);
             for o in self.cells.iter_mut() {
-                for f in [Some(&mut o.data), o.clk.as_mut(), o.ce.as_mut(), o.ar.as_mut(), o.ap.as_mut(), o.oe.as_mut()].into_iter().flatten() {
+                for f in
+                    [Some(&mut o.data), o.clk.as_mut(), o.ce.as_mut(), o.ar.as_mut(), o.ap.as_mut(), o.oe.as_mut()].into_iter().flatten()
+                {
                     if f.signals().contains(&s) {
                         *f = f.substitute(&s, &pos, &neg).minimize();
                     }
@@ -547,12 +556,15 @@ impl Design {
                 if refs.is_empty() {
                     return true;
                 }
-                let (f, fnot) = if c.active_low { (c.data.complement(), c.data.minimize()) } else { (c.data.minimize(), c.data.complement()) };
+                let (f, fnot) =
+                    if c.active_low { (c.data.complement(), c.data.minimize()) } else { (c.data.minimize(), c.data.complement()) };
                 refs.iter().all(|&v| if v { f.0.len() == 1 } else { fnot.0.len() == 1 })
             };
-            let Some(i) = self.cells.iter().position(|c| {
-                !c.is_output && c.storage == Storage::Comb && c.node.is_none() && c.oe.is_none() && fold_ok(c)
-            }) else {
+            let Some(i) = self
+                .cells
+                .iter()
+                .position(|c| !c.is_output && c.storage == Storage::Comb && c.node.is_none() && c.oe.is_none() && fold_ok(c))
+            else {
                 return;
             };
             let s = Signal::Fb(self.cells[i].name.clone(), false);
@@ -576,7 +588,11 @@ impl Design {
             }
             let (f, fnot) = {
                 let c = &self.cells[i];
-                if c.active_low { (c.data.complement(), c.data.minimize()) } else { (c.data.minimize(), c.data.complement()) }
+                if c.active_low {
+                    (c.data.complement(), c.data.minimize())
+                } else {
+                    (c.data.minimize(), c.data.complement())
+                }
             };
             // nor when the readers' covers would explode (an XOR tree: 2^(n-1) products): no
             // macrocell with its cascades holds more than ~80 products, so such a collapse can
@@ -584,18 +600,20 @@ impl Design {
             const MAX_PRODUCTS: usize = 256;
             let explodes = self.cells.iter().enumerate().any(|(j, o)| {
                 j != i
-                    && [Some(&o.data), o.clk.as_ref(), o.ce.as_ref(), o.ar.as_ref(), o.ap.as_ref(), o.oe.as_ref()].into_iter().flatten().any(|x| {
-                        let est: usize = x
-                            .0
-                            .iter()
-                            .map(|p| match p.iter().find(|(y, _)| y == &s) {
-                                Some((_, true)) => f.0.len(),
-                                Some((_, false)) => fnot.0.len(),
-                                None => 1,
-                            })
-                            .sum();
-                        est > MAX_PRODUCTS
-                    })
+                    && [Some(&o.data), o.clk.as_ref(), o.ce.as_ref(), o.ar.as_ref(), o.ap.as_ref(), o.oe.as_ref()]
+                        .into_iter()
+                        .flatten()
+                        .any(|x| {
+                            let est: usize =
+                                x.0.iter()
+                                    .map(|p| match p.iter().find(|(y, _)| y == &s) {
+                                        Some((_, true)) => f.0.len(),
+                                        Some((_, false)) => fnot.0.len(),
+                                        None => 1,
+                                    })
+                                    .sum();
+                            est > MAX_PRODUCTS
+                        })
             });
             if explodes {
                 self.cells[i].node = Some(0);

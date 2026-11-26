@@ -1,20 +1,18 @@
 //! Conformance test (§11.3): every vector in tests/vectors must reproduce ATMISP 7.3's output: the
 //! SVF byte for byte, the Load JEDEC files (§8) fuse for fuse.
 
-use flate2::read::GzDecoder;
 use atf15xx_tool::isp::chain;
 use atf15xx_tool::isp::diag::{Diagnostics, Error};
 use atf15xx_tool::isp::generate::{generate, GenOptions};
 use atf15xx_tool::isp::jedec;
 use atf15xx_tool::isp::svf::{Rev, SvfOptions};
+use flate2::read::GzDecoder;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
 fn gunzip(p: &Path) -> Vec<u8> {
     let mut v = Vec::new();
-    GzDecoder::new(std::fs::File::open(p).unwrap())
-        .read_to_end(&mut v)
-        .unwrap();
+    GzDecoder::new(std::fs::File::open(p).unwrap()).read_to_end(&mut v).unwrap();
     v
 }
 
@@ -70,40 +68,23 @@ fn local(dir: &Path, win_path: &str) -> PathBuf {
 }
 
 fn run_case(dir: &Path) -> Result<(), String> {
-    let meta: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(dir.join("case.json")).unwrap()).unwrap();
+    let meta: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.join("case.json")).unwrap()).unwrap();
     let expect_ok = meta["expect"] == "ok";
     let mut tck = meta.get("tck").and_then(|v| v.as_i64()).unwrap_or(1);
-    let rev = if meta.get("rev").and_then(|v| v.as_str()) == Some("C") {
-        Rev::C
-    } else {
-        Rev::D
-    };
-    let state_reset = meta
-        .get("state_reset")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(1)
-        != 0;
+    let rev = if meta.get("rev").and_then(|v| v.as_str()) == Some("C") { Rev::C } else { Rev::D };
+    let state_reset = meta.get("state_reset").and_then(|v| v.as_i64()).unwrap_or(1) != 0;
     if !(1..=1000).contains(&tck) {
         if meta.get("compat_tck").and_then(|v| v.as_bool()) == Some(true) {
             tck = 1;
         } else {
-            return if expect_ok {
-                Err("tck out of range".into())
-            } else {
-                Ok(())
-            };
+            return if expect_ok { Err("tck out of range".into()) } else { Ok(()) };
         }
     }
     let chn = std::fs::read(dir.join("chain.chn")).unwrap();
     let mut diag = Diagnostics::default();
     let parsed = chain::parse(&chn, &mut diag, |_, p| local(dir, p).is_file());
     let expected = dir.join("expected.svf.gz");
-    let want = if expected.exists() {
-        Some(gunzip(&expected))
-    } else {
-        None
-    };
+    let want = if expected.exists() { Some(gunzip(&expected)) } else { None };
     let (want_body, ctime) = match &want {
         Some(w) => {
             let (b, t) = without_line(w, "//  Created on: ");
@@ -113,22 +94,12 @@ fn run_case(dir: &Path) -> Result<(), String> {
     };
     let result = parsed.and_then(|c| {
         let opts = GenOptions {
-            svf: SvfOptions {
-                rev,
-                tck: tck as u32,
-                state_reset,
-                strict: false,
-            },
+            svf: SvfOptions { rev, tck: tck as u32, state_reset, strict: false },
             allow_mixed_voltage: true, // ATMISP's dialog was answered "Yes" by the oracle driver
             ctime: ctime.clone(),
             load_output: true,
         };
-        generate(
-            &c,
-            |x, p| std::fs::read(local(dir, p)).map_err(|_| Error::Input(chain::e3(x))),
-            &opts,
-            diag,
-        )
+        generate(&c, |x, p| std::fs::read(local(dir, p)).map_err(|_| Error::Input(chain::e3(x))), &opts, diag)
     });
     match (expect_ok, result) {
         (false, Err(_)) => Ok(()),
@@ -139,11 +110,7 @@ fn run_case(dir: &Path) -> Result<(), String> {
             if got_body != want_body {
                 let g = String::from_utf8_lossy(&got_body);
                 let w = String::from_utf8_lossy(&want_body);
-                let line = g
-                    .lines()
-                    .zip(w.lines())
-                    .position(|(a, b)| a != b)
-                    .unwrap_or(g.lines().count().min(w.lines().count()));
+                let line = g.lines().zip(w.lines()).position(|(a, b)| a != b).unwrap_or(g.lines().count().min(w.lines().count()));
                 return Err(format!(
                     "SVF differs at body line {} (got {:?}, want {:?})",
                     line + 1,
@@ -168,19 +135,8 @@ fn all_vectors_match_atmisp() {
     let mut failures = Vec::new();
     for d in &dirs {
         if let Err(e) = run_case(d) {
-            failures.push(format!(
-                "{}: {e}",
-                d.strip_prefix(env!("CARGO_MANIFEST_DIR"))
-                    .unwrap()
-                    .display()
-            ));
+            failures.push(format!("{}: {e}", d.strip_prefix(env!("CARGO_MANIFEST_DIR")).unwrap().display()));
         }
     }
-    assert!(
-        failures.is_empty(),
-        "{} of {} vectors failed:\n{}",
-        failures.len(),
-        dirs.len(),
-        failures.join("\n")
-    );
+    assert!(failures.is_empty(), "{} of {} vectors failed:\n{}", failures.len(), dirs.len(), failures.join("\n"));
 }

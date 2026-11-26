@@ -46,8 +46,7 @@ pub struct Part {
 
 /// Atmel's BSDL naming: `1508AS_J84.BSD` (J = PLCC, A = TQFP, Q = PQFP), any case.
 fn bsdl_file(files: &[PathBuf], dev: &Dev) -> Option<PathBuf> {
-    let (letters, digits): (String, String) =
-        dev.package.chars().partition(|c| c.is_ascii_alphabetic());
+    let (letters, digits): (String, String) = dev.package.chars().partition(|c| c.is_ascii_alphabetic());
     let code = match letters.as_str() {
         "PLCC" => "J",
         "TQFP" => "A",
@@ -55,23 +54,12 @@ fn bsdl_file(files: &[PathBuf], dev: &Dev) -> Option<PathBuf> {
         _ => return None,
     };
     let want = format!("{}AS_{code}{digits}.bsd", dev.family);
-    files
-        .iter()
-        .find(|p| {
-            p.file_name()
-                .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(&want))
-        })
-        .cloned()
+    files.iter().find(|p| p.file_name().is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(&want))).cloned()
 }
 
 pub fn bsd_files(dir: &Path) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
-        .unwrap_or_else(|e| {
-            panic!(
-                "{}: {e} (is the prjbureau submodule checked out?)",
-                dir.display()
-            )
-        })
+        .unwrap_or_else(|e| panic!("{}: {e} (is the prjbureau submodule checked out?)", dir.display()))
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("bsd")))
         .collect();
@@ -87,11 +75,7 @@ fn part(dev: &Dev, file: &Path) -> Result<Part, String> {
     let annotations = annotations(&text);
     let bsr = entity.boundary_register();
     if bsr.len() != entity.boundary_length() {
-        return Err(format!(
-            "{fname}: {} cells, BOUNDARY_LENGTH {}",
-            bsr.len(),
-            entity.boundary_length()
-        ));
+        return Err(format!("{fname}: {} cells, BOUNDARY_LENGTH {}", bsr.len(), entity.boundary_length()));
     }
     let ports = entity.ports();
     let port_pin = |i: usize| -> Option<u16> { ports.get(i).and_then(|p| p.pin.parse().ok()) };
@@ -125,10 +109,7 @@ fn part(dev: &Dev, file: &Path) -> Result<Part, String> {
         let mut pin = c.port.and_then(port_pin);
         if pin.is_none() {
             // a control cell takes the pin of the output it enables
-            pin = output_of
-                .get(&i)
-                .and_then(|&o| bsr[o].port)
-                .and_then(port_pin);
+            pin = output_of.get(&i).and_then(|&o| bsr[o].port).and_then(port_pin);
         }
         // Where a cell has a pin, the formal pin map (and the device table) decides; a comment
         // that disagrees is a typo in the file (e.g. 1508AS_Q160: two `MC59` in a row) and noted.
@@ -154,52 +135,33 @@ fn part(dev: &Dev, file: &Path) -> Result<Part, String> {
             });
             let mc = match (dedicated, pin) {
                 (Some(_), _) => None,
-                (None, Some(p)) => Some(mc_of_pin(p, &mut notes, false).ok_or_else(|| {
-                    format!(
-                        "{fname}: cell {i} on pin {p}, which is no I/O pin of {}",
-                        dev.name
-                    )
-                })?),
-                (None, None) => Some(note_mc.ok_or_else(|| {
-                    format!("{fname}: cell {i} has no port and no MC annotation")
-                })?),
+                (None, Some(p)) => Some(
+                    mc_of_pin(p, &mut notes, false)
+                        .ok_or_else(|| format!("{fname}: cell {i} on pin {p}, which is no I/O pin of {}", dev.name))?,
+                ),
+                (None, None) => Some(note_mc.ok_or_else(|| format!("{fname}: cell {i} has no port and no MC annotation"))?),
             };
             if let (Some(m), Some(nm)) = (mc, note_mc) {
                 if m != nm {
-                    notes.push(format!(
-                        "cell {i}: pin {} is MC{m}, its comment says MC{nm}",
-                        pin.unwrap_or(0)
-                    ));
+                    notes.push(format!("cell {i}: pin {} is MC{m}, its comment says MC{nm}", pin.unwrap_or(0)));
                 }
             }
-            cells.push(Cell {
-                bit: i,
-                kind: Kind::In,
-                mc,
-                dedicated,
-                pin,
-            });
+            cells.push(Cell { bit: i, kind: Kind::In, mc, dedicated, pin });
         } else {
             // the (output enable, output) pair of a macrocell: control + output3 for a pin,
             // two internal cells for a pinless macrocell (enable first)
             let mc = match pin {
-                Some(p) => mc_of_pin(p, &mut notes, true)
-                    .ok_or_else(|| format!("{fname}: cell {i} on pin {p}, no I/O pin"))?,
-                None => note_mc
-                    .ok_or_else(|| format!("{fname}: cell {i} has no port and no MC annotation"))?,
+                Some(p) => mc_of_pin(p, &mut notes, true).ok_or_else(|| format!("{fname}: cell {i} on pin {p}, no I/O pin"))?,
+                None => note_mc.ok_or_else(|| format!("{fname}: cell {i} has no port and no MC annotation"))?,
             };
             if let (Some(p), Some(nm)) = (pin, note_mc) {
                 if nm != mc {
-                    notes.push(format!(
-                        "cell {i}: pin {p} is MC{mc}, its comment says MC{nm}"
-                    ));
+                    notes.push(format!("cell {i}: pin {p} is MC{mc}, its comment says MC{nm}"));
                 }
             }
             let kind = match c.function {
                 bsdl::CellFunction::Control => Kind::Oe,
-                bsdl::CellFunction::Output3
-                | bsdl::CellFunction::Output2
-                | bsdl::CellFunction::Bidir => Kind::Out,
+                bsdl::CellFunction::Output3 | bsdl::CellFunction::Output2 | bsdl::CellFunction::Bidir => Kind::Out,
                 _ => {
                     let k = pairs.entry(mc).or_insert(0);
                     *k += 1;
@@ -210,13 +172,7 @@ fn part(dev: &Dev, file: &Path) -> Result<Part, String> {
                     }
                 }
             };
-            cells.push(Cell {
-                bit: i,
-                kind,
-                mc: Some(mc),
-                dedicated: None,
-                pin,
-            });
+            cells.push(Cell { bit: i, kind, mc: Some(mc), dedicated: None, pin });
         }
     }
     // macrocells whose pad is a JTAG pin: the BSDL gives their cells no port (the TAP owns the
@@ -231,46 +187,23 @@ fn part(dev: &Dev, file: &Path) -> Result<Part, String> {
     // every macrocell: one oe and one out cell, at most one input cell; pins agree with the device
     for mc in 1..=dev.macrocells() {
         for kind in [Kind::In, Kind::Oe, Kind::Out] {
-            let n = cells
-                .iter()
-                .filter(|c| c.mc == Some(mc) && c.kind == kind)
-                .count();
+            let n = cells.iter().filter(|c| c.mc == Some(mc) && c.kind == kind).count();
             if n > 1 || (n == 0 && kind != Kind::In) {
                 problems.push(format!("MC{mc}: {n} {kind:?} cells"));
             }
         }
-        let pins: Vec<_> = cells
-            .iter()
-            .filter(|c| c.mc == Some(mc))
-            .filter_map(|c| c.pin)
-            .collect();
-        let want = dev.mc_pin(mc).or_else(|| {
-            pins.first()
-                .copied()
-                .filter(|&p| dev.input_only_mc(p) == Some(mc))
-        });
+        let pins: Vec<_> = cells.iter().filter(|c| c.mc == Some(mc)).filter_map(|c| c.pin).collect();
+        let want = dev.mc_pin(mc).or_else(|| pins.first().copied().filter(|&p| dev.input_only_mc(p) == Some(mc)));
         if pins.iter().any(|&p| Some(p) != want) {
             problems.push(format!("MC{mc}: BSDL pins {pins:?}, device pin {want:?}"));
         }
     }
     if !problems.is_empty() {
-        return Err(format!(
-            "{fname} does not match {}:\n  {}",
-            dev.name,
-            problems.join("\n  ")
-        ));
+        return Err(format!("{fname} does not match {}:\n  {}", dev.name, problems.join("\n  ")));
     }
-    let mut opcodes: Vec<(String, u64)> = entity
-        .opcodes()
-        .iter()
-        .map(|(k, v)| (k.clone(), *v))
-        .collect();
+    let mut opcodes: Vec<(String, u64)> = entity.opcodes().iter().map(|(k, v)| (k.clone(), *v)).collect();
     opcodes.sort();
-    let idcodes = entity
-        .idcode_register()
-        .iter()
-        .flat_map(|id| expand_x(&id.to_string()))
-        .collect();
+    let idcodes = entity.idcode_register().iter().flat_map(|id| expand_x(&id.to_string())).collect();
     Ok(Part {
         name: format!("ATF{}AS-{}", dev.family, dev.package),
         device: dev.name.clone(),
@@ -311,22 +244,14 @@ fn annotations(text: &str) -> BTreeMap<usize, Note> {
             let rest = rest.trim_start();
             if let Some((kind, what)) = rest.split_once(',') {
                 let note = parse_note(what);
-                if note.mc.is_some()
-                    || ["Input", "Internal", "I/O"]
-                        .iter()
-                        .any(|k| kind.trim().starts_with(k))
-                {
+                if note.mc.is_some() || ["Input", "Internal", "I/O"].iter().any(|k| kind.trim().starts_with(k)) {
                     pending = Some(note);
                 }
             }
             continue;
         }
         if let Some(rest) = s.strip_prefix('"') {
-            let num: String = rest
-                .trim_start()
-                .chars()
-                .take_while(|c| c.is_ascii_digit())
-                .collect();
+            let num: String = rest.trim_start().chars().take_while(|c| c.is_ascii_digit()).collect();
             if let (Ok(i), Some(n)) = (num.parse::<usize>(), pending) {
                 out.insert(i, n);
             }
@@ -345,11 +270,7 @@ fn parse_note(what: &str) -> Note {
     while let Some(t) = toks.next() {
         let t = t.to_ascii_lowercase();
         if let Some(n) = t.strip_prefix("pin") {
-            note.pin = if n.is_empty() {
-                toks.next().and_then(|x| x.parse().ok())
-            } else {
-                n.parse().ok()
-            };
+            note.pin = if n.is_empty() { toks.next().and_then(|x| x.parse().ok()) } else { n.parse().ok() };
         } else if let Some(n) = t.strip_prefix("mc") {
             note.mc = n.parse().ok();
         }
@@ -359,13 +280,7 @@ fn parse_note(what: &str) -> Note {
 
 /// `0000000101010000100X000000111111 = 0x...` -> every value the `X` bits allow.
 fn expand_x(s: &str) -> Vec<u32> {
-    let bits: String = s
-        .split_whitespace()
-        .next()
-        .unwrap_or("")
-        .chars()
-        .filter(|c| "01xX".contains(*c))
-        .collect();
+    let bits: String = s.split_whitespace().next().unwrap_or("").chars().filter(|c| "01xX".contains(*c)).collect();
     let mut vals = vec![0u32];
     for c in bits.chars() {
         vals = match c {
@@ -385,10 +300,7 @@ pub fn emit(dir: &Path, devs: &[Dev]) -> String {
     for d in devs {
         let name = format!("ATF{}AS-{}", d.family, d.package);
         match bsdl_file(&files, d) {
-            None => errors.push((
-                name.clone(),
-                format!("no BSDL file for {name} ({}) in prjbureau's bsdl/", d.name),
-            )),
+            None => errors.push((name.clone(), format!("no BSDL file for {name} ({}) in prjbureau's bsdl/", d.name))),
             Some(f) => match part(d, &f) {
                 Ok(p) => parts.push(p),
                 Err(e) => errors.push((name, e)),
@@ -397,11 +309,11 @@ pub fn emit(dir: &Path, devs: &[Dev]) -> String {
     }
     let mut o = String::from("pub(crate) static PARTS: &[Part] = &[\n");
     for p in &parts {
-        let cells: Vec<String> =
-            p.cells
-                .iter()
-                .map(|c| {
-                    format!(
+        let cells: Vec<String> = p
+            .cells
+            .iter()
+            .map(|c| {
+                format!(
                     "Cell {{ bit: {}, kind: CellKind::{:?}, mc: {:?}, dedicated: {}, pin: {:?} }}",
                     c.bit,
                     c.kind,
@@ -409,8 +321,8 @@ pub fn emit(dir: &Path, devs: &[Dev]) -> String {
                     c.dedicated.map_or("None".into(), |d| format!("Some(DedicatedPin::{d})")),
                     c.pin
                 )
-                })
-                .collect();
+            })
+            .collect();
         o += &format!(
             "    Part {{ name: {:?}, device: {:?}, bsdl_file: {:?}, ir_len: {}, opcodes: &[{}], idcodes: &[{}], length: {}, \
              cells: &[\n        {}], notes: &[{}], jtag_pins: {:?}, max_tck_khz: {:?} }},\n",
@@ -434,17 +346,9 @@ pub fn emit(dir: &Path, devs: &[Dev]) -> String {
     o += "];\n\n/// Every BSDL file and the IDCODEs it allows (identifies a die: device and voltage, not package).\npub(crate) static BSDL_IDCODES: &[(&str, &[u32])] = &[\n";
     for f in &files {
         if let Ok(e) = bsdl::Entity::parse(f, None) {
-            let ids: Vec<String> = e
-                .idcode_register()
-                .iter()
-                .flat_map(|i| expand_x(&i.to_string()))
-                .map(|v| format!("{v:#010x}"))
-                .collect();
-            o += &format!(
-                "    ({:?}, &[{}]),\n",
-                f.file_name().unwrap().to_string_lossy(),
-                ids.join(", ")
-            );
+            let ids: Vec<String> =
+                e.idcode_register().iter().flat_map(|i| expand_x(&i.to_string())).map(|v| format!("{v:#010x}")).collect();
+            o += &format!("    ({:?}, &[{}]),\n", f.file_name().unwrap().to_string_lossy(), ids.join(", "));
         }
     }
     o + "];\n"

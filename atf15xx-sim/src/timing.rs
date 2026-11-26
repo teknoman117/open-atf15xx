@@ -31,8 +31,7 @@ impl Params {
     /// Parameters for `grade` (e.g. `-10` or `10`) of the model's family (`atf15xx_arch::timing`).
     pub fn for_model(model: &Model, grade: &str) -> Result<Params, String> {
         use atf15xx_arch::timing;
-        let gi = timing::grade_index(grade)
-            .ok_or_else(|| format!("unknown speed grade {grade} (known: {})", timing::GRADES.join(" ")))?;
+        let gi = timing::grade_index(grade).ok_or_else(|| format!("unknown speed grade {grade} (known: {})", timing::GRADES.join(" ")))?;
         let values = timing::params(model.family).iter().map(|(k, v)| (*k, v[gi])).collect();
         Ok(Params { grade: timing::GRADES[gi].to_string(), values })
     }
@@ -224,7 +223,13 @@ impl Ctx<'_> {
         let c = self.mc(mc).clone();
         let lad = self.p.get("tLAD") + self.rpa(mc);
         let pt2 = if c.xor_pt2 { self.pt(mc, 1).map(|a| a.plus(lad, 0)) } else { None };
-        let a = if c.const_one { None } else if c.a_is_one { pt2 } else { Arrival::later(self.sum(mc), pt2) };
+        let a = if c.const_one {
+            None
+        } else if c.a_is_one {
+            pt2
+        } else {
+            Arrival::later(self.sum(mc), pt2)
+        };
         self.busy.remove(&mc);
         self.memo_x.insert(mc, a);
         a
@@ -242,10 +247,9 @@ impl Ctx<'_> {
                 (a, self.p.get("tSU"))
             }
             DSource::Pt2 => (self.pt(mc, 1).map(|a| a.plus(self.p.get("tLAD") + self.rpa(mc), 0)), self.p.get("tSU")),
-            DSource::Pad => (
-                (self.mode == Mode::Pin).then(|| Arrival { ns: self.p.get("tFIN"), passes: 0, from: From::Pad(mc) }),
-                self.p.get("tFSU"),
-            ),
+            DSource::Pad => {
+                ((self.mode == Mode::Pin).then(|| Arrival { ns: self.p.get("tFIN"), passes: 0, from: From::Pad(mc) }), self.p.get("tFSU"))
+            }
         }
     }
     /// Clock-enable arrival (PT4 as CE), with its setup.
@@ -292,7 +296,14 @@ pub fn analyse(model: &Model, p: &Params, vccio: Vccio) -> Report {
         let (d, su) = ctx.d(mc);
         for (a, what) in [(d, "data"), (ctx.ce(mc), "clock enable")] {
             if let Some(a) = a {
-                reg_to_reg.push(RegPath { mc, clock_pin: clock_pin_of(model, mc), ns: a.ns + su - skew, passes: a.passes, from: a.from, what });
+                reg_to_reg.push(RegPath {
+                    mc,
+                    clock_pin: clock_pin_of(model, mc),
+                    ns: a.ns + su - skew,
+                    passes: a.passes,
+                    from: a.from,
+                    what,
+                });
             }
         }
     }
@@ -328,7 +339,14 @@ pub fn analyse(model: &Model, p: &Params, vccio: Vccio) -> Report {
         for (a, what) in [(d, "data"), (ctx.ce(mc), "clock enable")] {
             if let Some(a) = a {
                 let floor = if fast { p.get("tFSU_global") } else { p.get("tSU_global") };
-                tsu.push(RegPath { mc, clock_pin: clock_pin_of(model, mc), ns: (a.ns + su - clk).max(floor), passes: a.passes, from: a.from, what });
+                tsu.push(RegPath {
+                    mc,
+                    clock_pin: clock_pin_of(model, mc),
+                    ns: (a.ns + su - clk).max(floor),
+                    passes: a.passes,
+                    from: a.from,
+                    what,
+                });
             }
         }
     }
@@ -365,7 +383,13 @@ impl Report {
             From::Pin(p) => format!("pin {p}"),
             From::Pad(m) => format!("pad of MC{m}"),
         };
-        writeln!(o, "timing: speed grade {}, VCCIO {}, vendor tables (whole ns), floors per F8.2.1", self.grade, if self.vccio == Vccio::V5 { "5 V" } else { "3.3 V" }).unwrap();
+        writeln!(
+            o,
+            "timing: speed grade {}, VCCIO {}, vendor tables (whole ns), floors per F8.2.1",
+            self.grade,
+            if self.vccio == Vccio::V5 { "5 V" } else { "3.3 V" }
+        )
+        .unwrap();
         match (self.period, self.fmax_mhz) {
             (Some(t), Some(f)) => writeln!(o, "fmax: {f:.1} MHz (period {t:.1} ns)").unwrap(),
             _ => writeln!(o, "fmax: no register-to-register path").unwrap(),
@@ -376,7 +400,16 @@ impl Report {
         }
         writeln!(o, "\npin to pin (tPD):").unwrap();
         for r in self.tpd.iter().take(limit) {
-            writeln!(o, "  {:7.1} ns  {:>2} UIM pass(es)  {} -> pin {} ({})", r.ns, r.passes, r.from.map_or("-".into(), from), r.pin, name(r.mc)).unwrap();
+            writeln!(
+                o,
+                "  {:7.1} ns  {:>2} UIM pass(es)  {} -> pin {} ({})",
+                r.ns,
+                r.passes,
+                r.from.map_or("-".into(), from),
+                r.pin,
+                name(r.mc)
+            )
+            .unwrap();
         }
         writeln!(o, "\nclock to output (tCO):").unwrap();
         for r in self.tco.iter().take(limit) {

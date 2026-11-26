@@ -30,18 +30,66 @@ type Prod = Vec<Lit>;
 
 /// Coarse cell types lowered here.
 pub const LOWERED: &[&str] = &[
-    "$not", "$pos", "$buf", "$and", "$or", "$xor", "$xnor", "$reduce_and", "$reduce_or", "$reduce_xor",
-    "$reduce_xnor", "$reduce_bool", "$logic_not", "$logic_and", "$logic_or", "$eq", "$ne", "$eqx", "$nex",
-    "$lt", "$le", "$gt", "$ge", "$mux", "$pmux", "$shiftx", "$add", "$sub", "$neg",
+    "$not",
+    "$pos",
+    "$buf",
+    "$and",
+    "$or",
+    "$xor",
+    "$xnor",
+    "$reduce_and",
+    "$reduce_or",
+    "$reduce_xor",
+    "$reduce_xnor",
+    "$reduce_bool",
+    "$logic_not",
+    "$logic_and",
+    "$logic_or",
+    "$eq",
+    "$ne",
+    "$eqx",
+    "$nex",
+    "$lt",
+    "$le",
+    "$gt",
+    "$ge",
+    "$mux",
+    "$pmux",
+    "$shiftx",
+    "$add",
+    "$sub",
+    "$neg",
 ];
 
 /// Coarse cell types left to Yosys's techmap (`techmap` + `simplemap`) before the netlist
 /// reaches Rust. Shifts by a constant are wiring after `opt_expr`/`wreduce`; variable ones are
 /// rare in CPLD designs.
 pub const UNSUPPORTED: &[&str] = &[
-    "$mul", "$div", "$mod", "$divfloor", "$modfloor", "$pow", "$shl", "$shr", "$sshl", "$sshr", "$shift",
-    "$alu", "$macc", "$macc_v2", "$lcu", "$fa", "$bmux", "$demux", "$bweqx", "$bwmux", "$tribuf", "$lut", "$slice",
-    "$concat", "$bweq",
+    "$mul",
+    "$div",
+    "$mod",
+    "$divfloor",
+    "$modfloor",
+    "$pow",
+    "$shl",
+    "$shr",
+    "$sshl",
+    "$sshr",
+    "$shift",
+    "$alu",
+    "$macc",
+    "$macc_v2",
+    "$lcu",
+    "$fa",
+    "$bmux",
+    "$demux",
+    "$bweqx",
+    "$bwmux",
+    "$tribuf",
+    "$lut",
+    "$slice",
+    "$concat",
+    "$bweq",
 ];
 
 struct Ctx {
@@ -283,11 +331,7 @@ fn add(ctx: &mut Ctx, a: &[Lb], b: &[Lb], cin: Lb) -> Vec<Lb> {
         let s = ctx.xor_small(&[a[i], b[i], c]);
         out.push(s);
         if i + 1 < n {
-            c = ctx.emit(vec![
-                vec![(a[i], true), (b[i], true)],
-                vec![(a[i], true), (c, true)],
-                vec![(b[i], true), (c, true)],
-            ]);
+            c = ctx.emit(vec![vec![(a[i], true), (b[i], true)], vec![(a[i], true), (c, true)], vec![(b[i], true), (c, true)]]);
         }
     }
     out
@@ -331,7 +375,13 @@ pub fn lower_module(m: &mut ynet::Module) -> Result<usize, String> {
     }
     let mut order: Vec<String> = vec![];
     let mut state: BTreeMap<String, u8> = BTreeMap::new();
-    fn visit(n: &str, cells: &BTreeMap<String, ynet::Cell>, driver: &BTreeMap<u64, String>, state: &mut BTreeMap<String, u8>, order: &mut Vec<String>) {
+    fn visit(
+        n: &str,
+        cells: &BTreeMap<String, ynet::Cell>,
+        driver: &BTreeMap<u64, String>,
+        state: &mut BTreeMap<String, u8>,
+        order: &mut Vec<String>,
+    ) {
         match state.get(n) {
             Some(_) => return,
             None => {
@@ -344,7 +394,10 @@ pub fn lower_module(m: &mut ynet::Module) -> Result<usize, String> {
                 continue;
             }
             for b in v {
-                if let Some(d) = match b { Bit::Net(x) => driver.get(x), Bit::Const(_) => None } {
+                if let Some(d) = match b {
+                    Bit::Net(x) => driver.get(x),
+                    Bit::Const(_) => None,
+                } {
                     visit(d, cells, driver, state, order);
                 }
             }

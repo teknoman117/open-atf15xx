@@ -11,16 +11,12 @@ pub type Bits = Vec<u8>;
 
 /// `bits(v, n)`: the n-character LSB-first string of `v`.
 pub fn bits(v: u64, n: usize) -> Bits {
-    (0..n)
-        .map(|i| if (v >> i) & 1 == 1 { b'1' } else { b'0' })
-        .collect()
+    (0..n).map(|i| if (v >> i) & 1 == 1 { b'1' } else { b'0' }).collect()
 }
 
 /// 16-bit value written MSB first (§6.7, `BEADDR`).
 pub fn msb16(v: u32) -> Bits {
-    (0..16)
-        .map(|i| if (v >> (15 - i)) & 1 == 1 { b'1' } else { b'0' })
-        .collect()
+    (0..16).map(|i| if (v >> (15 - i)) & 1 == 1 { b'1' } else { b'0' }).collect()
 }
 
 pub fn ones(n: usize) -> Bits {

@@ -1,6 +1,5 @@
 //! The ATMISP-compatible commands of `atf15xx-tool` (§10): `svf`, `chain`, `jed`.
 
-use clap::{Args, Subcommand, ValueEnum};
 use atf15xx_tool::isp::chain::{self, Chain, Device};
 use atf15xx_tool::isp::device::{self, Instr};
 use atf15xx_tool::isp::diag::{Diagnostics, Error};
@@ -8,6 +7,7 @@ use atf15xx_tool::isp::generate::{generate, GenOptions};
 use atf15xx_tool::isp::jedec;
 use atf15xx_tool::isp::svf::{Rev, SvfOptions};
 use atf15xx_tool::isp::timefmt;
+use clap::{Args, Subcommand, ValueEnum};
 use std::path::{Path, PathBuf};
 
 #[derive(Subcommand)]
@@ -111,12 +111,7 @@ pub struct SvfArgs {
 
 fn parse_drive(s: &str) -> Result<(char, PathBuf), String> {
     let (d, dir) = s.split_once('=').ok_or("expected X=DIR")?;
-    let c = d
-        .trim_end_matches(':')
-        .chars()
-        .next()
-        .filter(|c| c.is_ascii_alphabetic())
-        .ok_or("expected X=DIR")?;
+    let c = d.trim_end_matches(':').chars().next().filter(|c| c.is_ascii_alphabetic()).ok_or("expected X=DIR")?;
     Ok((c.to_ascii_uppercase(), PathBuf::from(dir)))
 }
 
@@ -125,11 +120,7 @@ pub fn run(cmd: Cmd) -> Result<(), Error> {
     match cmd {
         Cmd::Svf(a) => cmd_svf(a),
         Cmd::Chain(ChainCmd::Show { chain, paths }) => cmd_chain_show(&chain, &paths),
-        Cmd::Chain(ChainCmd::Create {
-            devices,
-            output,
-            calibration,
-        }) => cmd_chain_create(&devices, &output, calibration),
+        Cmd::Chain(ChainCmd::Create { devices, output, calibration }) => cmd_chain_create(&devices, &output, calibration),
         Cmd::Jed(JedCmd::Info { file }) => cmd_jed_info(&file),
     }
 }
@@ -149,9 +140,7 @@ fn parse_device_spec(spec: &str) -> Result<Device, Error> {
         if k >= 2
             && p.len() == 1
             && p.chars().all(|c| c.is_ascii_alphabetic())
-            && raw
-                .get(k + 1)
-                .is_some_and(|n| n.starts_with('\\') || n.starts_with('/'))
+            && raw.get(k + 1).is_some_and(|n| n.starts_with('\\') || n.starts_with('/'))
         {
             parts.push(format!("{}:{}", p, raw[k + 1]));
             k += 2;
@@ -161,24 +150,13 @@ fn parse_device_spec(spec: &str) -> Result<Device, Error> {
         }
     }
     if parts.len() < 2 {
-        return Err(usage(format!(
-            "invalid --device '{spec}' (expected NAME:INSTRUCTION[:JED])"
-        )));
+        return Err(usage(format!("invalid --device '{spec}' (expected NAME:INSTRUCTION[:JED])")));
     }
-    let instr = Instr::parse_cli(&parts[1])
-        .ok_or_else(|| usage(format!("unknown instruction '{}'", parts[1])))?;
-    let mut d = Device {
-        name: parts[0].clone(),
-        ir_width: 10,
-        idcode: true,
-        instr,
-        jed_path: String::new(),
-    };
+    let instr = Instr::parse_cli(&parts[1]).ok_or_else(|| usage(format!("unknown instruction '{}'", parts[1])))?;
+    let mut d = Device { name: parts[0].clone(), ir_width: 10, idcode: true, instr, jed_path: String::new() };
     for p in &parts[2..] {
         if let Some(w) = p.strip_prefix("w=") {
-            d.ir_width = w
-                .parse()
-                .map_err(|_| usage(format!("invalid width '{w}'")))?;
+            d.ir_width = w.parse().map_err(|_| usage(format!("invalid width '{w}'")))?;
         } else if p == "noid" {
             d.idcode = false;
         } else if d.jed_path.is_empty() {
@@ -194,12 +172,7 @@ fn parse_device_spec(spec: &str) -> Result<Device, Error> {
 }
 
 /// §10.3 path resolution.
-fn resolve(
-    path: &str,
-    base: Option<&Path>,
-    drives: &[(char, PathBuf)],
-    must_exist: bool,
-) -> Option<PathBuf> {
+fn resolve(path: &str, base: Option<&Path>, drives: &[(char, PathBuf)], must_exist: bool) -> Option<PathBuf> {
     if path.is_empty() {
         return None;
     }
@@ -227,19 +200,13 @@ fn resolve(
     if must_exist {
         cands.into_iter().find(|p| p.is_file())
     } else {
-        cands.into_iter().find(|p| {
-            p.parent()
-                .is_none_or(|d| d.as_os_str().is_empty() || d.is_dir())
-        })
+        cands.into_iter().find(|p| p.parent().is_none_or(|d| d.as_os_str().is_empty() || d.is_dir()))
     }
 }
 
 fn print_diag(diag: &Diagnostics, quiet: bool) {
     for w in &diag.warnings {
-        eprintln!(
-            "warning: {}",
-            w.trim_start_matches("warning: ").replace('\n', " ")
-        );
+        eprintln!("warning: {}", w.trim_start_matches("warning: ").replace('\n', " "));
     }
     if !quiet {
         for l in &diag.transcript {
@@ -251,20 +218,16 @@ fn print_diag(diag: &Diagnostics, quiet: bool) {
 fn write_atomic(path: &Path, data: &[u8]) -> Result<(), Error> {
     use std::io::Write;
     if path.as_os_str() == "-" {
-        return std::io::stdout()
-            .write_all(data)
-            .map_err(|e| Error::Io(format!("cannot write stdout: {e}")));
+        return std::io::stdout().write_all(data).map_err(|e| Error::Io(format!("cannot write stdout: {e}")));
     }
     // devices, FIFOs etc. cannot be replaced by rename: write them directly
     if path.exists() && !path.is_file() {
-        return std::fs::write(path, data)
-            .map_err(|e| Error::Io(format!("cannot write {}: {e}", path.display())));
+        return std::fs::write(path, data).map_err(|e| Error::Io(format!("cannot write {}: {e}", path.display())));
     }
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(format!(".tmp{}", std::process::id()));
     let tmp = PathBuf::from(tmp);
-    std::fs::write(&tmp, data)
-        .map_err(|e| Error::Io(format!("cannot write {}: {e}", tmp.display())))?;
+    std::fs::write(&tmp, data).map_err(|e| Error::Io(format!("cannot write {}: {e}", tmp.display())))?;
     std::fs::rename(&tmp, path).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
         Error::Io(format!("cannot write {}: {e}", path.display()))
@@ -275,31 +238,19 @@ fn timestamp(explicit: &Option<String>) -> String {
     if let Some(t) = explicit {
         return t.clone();
     }
-    if let Some(t) = std::env::var("SOURCE_DATE_EPOCH")
-        .ok()
-        .and_then(|s| s.trim().parse::<i64>().ok())
-        .and_then(timefmt::from_epoch_utc)
-    {
+    if let Some(t) = std::env::var("SOURCE_DATE_EPOCH").ok().and_then(|s| s.trim().parse::<i64>().ok()).and_then(timefmt::from_epoch_utc) {
         return t;
     }
     timefmt::now_local()
 }
 
-fn devices_from_specs(
-    specs: &[String],
-    drives: &[(char, PathBuf)],
-    check_jed: bool,
-) -> Result<Vec<Device>, Error> {
-    let devices = specs
-        .iter()
-        .map(|s| parse_device_spec(s))
-        .collect::<Result<Vec<_>, _>>()?;
+fn devices_from_specs(specs: &[String], drives: &[(char, PathBuf)], check_jed: bool) -> Result<Vec<Device>, Error> {
+    let devices = specs.iter().map(|s| parse_device_spec(s)).collect::<Result<Vec<_>, _>>()?;
     if devices.is_empty() || devices.len() > 50 {
         return Err(Error::Input(chain::E2.into()));
     }
     for (i, d) in devices.iter().enumerate() {
-        if check_jed && d.instr.reads_jedec() && resolve(&d.jed_path, None, drives, true).is_none()
-        {
+        if check_jed && d.instr.reads_jedec() && resolve(&d.jed_path, None, drives, true).is_none() {
             return Err(Error::Input(chain::e3(i + 1)));
         }
     }
@@ -309,25 +260,13 @@ fn devices_from_specs(
 fn load_chain(a: &SvfArgs, diag: &mut Diagnostics) -> Result<(Chain, Option<PathBuf>), Error> {
     match (&a.chain, a.devices.device.is_empty()) {
         (Some(path), true) => {
-            let data = std::fs::read(path).map_err(|e| {
-                Error::Input(format!("Cannot open Chain File {}: {e}", path.display()))
-            })?;
+            let data = std::fs::read(path).map_err(|e| Error::Input(format!("Cannot open Chain File {}: {e}", path.display())))?;
             let base = path.parent().map(Path::to_path_buf);
-            let c = chain::parse(&data, diag, |_, jp| {
-                resolve(jp, base.as_deref(), &a.paths.drive, true).is_some()
-            })?;
+            let c = chain::parse(&data, diag, |_, jp| resolve(jp, base.as_deref(), &a.paths.drive, true).is_some())?;
             Ok((c, base))
         }
-        (None, false) => Ok((
-            Chain {
-                calibration: 1,
-                devices: devices_from_specs(&a.devices.device, &a.paths.drive, true)?,
-            },
-            None,
-        )),
-        (Some(_), false) => Err(usage(
-            "give either a chain file or --device options, not both",
-        )),
+        (None, false) => Ok((Chain { calibration: 1, devices: devices_from_specs(&a.devices.device, &a.paths.drive, true)? }, None)),
+        (Some(_), false) => Err(usage("give either a chain file or --device options, not both")),
         (None, true) => Err(usage("no chain file or --device given")),
     }
 }
@@ -339,9 +278,7 @@ fn cmd_svf(a: SvfArgs) -> Result<(), Error> {
             eprintln!("warning: Invalid Tck period. Default Tck value is set to 1. Valid Tck range: 1 - 1000");
             tck = 1;
         } else {
-            return Err(Error::Input(
-                "Invalid Tck period. Valid Tck range: 1 - 1000".into(),
-            ));
+            return Err(Error::Input("Invalid Tck period. Valid Tck range: 1 - 1000".into()));
         }
     }
     let mut diag = Diagnostics::default();
@@ -364,8 +301,7 @@ fn cmd_svf(a: SvfArgs) -> Result<(), Error> {
     let output = generate(
         &chain,
         |x, p| {
-            let rp = resolve(p, base.as_deref(), drives, true)
-                .ok_or_else(|| Error::Input(chain::e3(x)))?;
+            let rp = resolve(p, base.as_deref(), drives, true).ok_or_else(|| Error::Input(chain::e3(x)))?;
             std::fs::read(&rp).map_err(|_| Error::Input(chain::e3(x)))
         },
         &opts,
@@ -374,11 +310,8 @@ fn cmd_svf(a: SvfArgs) -> Result<(), Error> {
     // resolve Load outputs before writing anything (§10.4: no partial output on errors)
     let mut jed_targets = Vec::new();
     for (x, p, bytes) in &output.jedec_outputs {
-        let rp = resolve(p, base.as_deref(), drives, false).ok_or_else(|| {
-            Error::Input(format!(
-                "cannot resolve JEDEC output path for device # {x}: '{p}'"
-            ))
-        })?;
+        let rp = resolve(p, base.as_deref(), drives, false)
+            .ok_or_else(|| Error::Input(format!("cannot resolve JEDEC output path for device # {x}: '{p}'")))?;
         jed_targets.push((rp, bytes));
     }
     write_atomic(&a.output, &output.svf)?;
@@ -390,22 +323,16 @@ fn cmd_svf(a: SvfArgs) -> Result<(), Error> {
 }
 
 fn cmd_chain_show(path: &Path, paths: &PathArgs) -> Result<(), Error> {
-    let data = std::fs::read(path)
-        .map_err(|e| Error::Input(format!("Cannot open Chain File {}: {e}", path.display())))?;
+    let data = std::fs::read(path).map_err(|e| Error::Input(format!("Cannot open Chain File {}: {e}", path.display())))?;
     let base = path.parent().map(Path::to_path_buf);
     let mut diag = Diagnostics::default();
-    let c = chain::parse(&data, &mut diag, |_, jp| {
-        resolve(jp, base.as_deref(), &paths.drive, true).is_some()
-    });
+    let c = chain::parse(&data, &mut diag, |_, jp| resolve(jp, base.as_deref(), &paths.drive, true).is_some());
     for w in &diag.warnings {
         eprintln!("warning: {}", w.replace('\n', " "));
     }
     let c = c?;
     println!("calibration constant: {}", c.calibration);
-    println!(
-        "{:>3}  {:<12} {:>5}  {:<6} {:<22} JEDEC",
-        "#", "device", "width", "idcode", "instruction"
-    );
+    println!("{:>3}  {:<12} {:>5}  {:<6} {:<22} JEDEC", "#", "device", "width", "idcode", "instruction");
     for (i, d) in c.devices.iter().enumerate() {
         println!(
             "{:>3}  {:<12} {:>5}  {:<6} {:<22} {}",
@@ -413,11 +340,7 @@ fn cmd_chain_show(path: &Path, paths: &PathArgs) -> Result<(), Error> {
             d.name,
             d.ir_width,
             if d.idcode { "yes" } else { "no" },
-            if d.instr == Instr::NoneOrInvalid {
-                "(invalid)"
-            } else {
-                d.instr.name()
-            },
+            if d.instr == Instr::NoneOrInvalid { "(invalid)" } else { d.instr.name() },
             d.jed_path
         );
     }
@@ -425,31 +348,20 @@ fn cmd_chain_show(path: &Path, paths: &PathArgs) -> Result<(), Error> {
 }
 
 fn cmd_chain_create(devices: &DeviceArgs, output: &Path, calibration: u32) -> Result<(), Error> {
-    let c = Chain {
-        calibration,
-        devices: devices_from_specs(&devices.device, &[], false)?,
-    };
+    let c = Chain { calibration, devices: devices_from_specs(&devices.device, &[], false)? };
     write_atomic(output, &chain::write(&c))
 }
 
 fn cmd_jed_info(path: &Path) -> Result<(), Error> {
-    let data = std::fs::read(path)
-        .map_err(|e| Error::Input(format!("cannot read {}: {e}", path.display())))?;
+    let data = std::fs::read(path).map_err(|e| Error::Input(format!("cannot read {}: {e}", path.display())))?;
     let j = jedec::parse(&data)?;
-    println!(
-        "QF:                {}",
-        j.qf.map_or("(none)".into(), |q| q.to_string())
-    );
-    println!(
-        "family:            {}",
-        j.family().map_or("(unknown)", |f| f.label())
-    );
+    println!("QF:                {}", j.qf.map_or("(none)".into(), |q| q.to_string()));
+    println!("family:            {}", j.family().map_or("(unknown)", |f| f.label()));
     println!("default (F):       {}", j.default as char);
     println!("security (G):      {}", j.security as char);
     println!(
         "checksum:          stated {}  computed {:04X}",
-        j.stated_checksum
-            .map_or("(none)".into(), |c| format!("{c:04X}")),
+        j.stated_checksum.map_or("(none)".into(), |c| format!("{c:04X}")),
         j.checksum()
     );
     if let Some(f) = j.family() {
@@ -457,11 +369,7 @@ fn cmd_jed_info(path: &Path) -> Result<(), Error> {
             Some(jf) => println!("JTAG enable fuse:  F[{jf}] = {}", j.fuses[jf] as char),
             None => println!("JTAG enable fuse:  (none; always enabled)"),
         }
-        let names: Vec<&str> = device::SUPPORTED
-            .iter()
-            .copied()
-            .filter(|n| device::expected_family(n) == Some(f))
-            .collect();
+        let names: Vec<&str> = device::SUPPORTED.iter().copied().filter(|n| device::expected_family(n) == Some(f)).collect();
         println!("valid for:         {}", names.join(" "));
     }
     Ok(())
@@ -470,12 +378,9 @@ fn cmd_jed_info(path: &Path) -> Result<(), Error> {
 /// The SVF that programs and verifies one device with `jed` (the `program` command), and whether
 /// the image keeps the JTAG port enabled. `device` is the ISP device name (`ATF1508AS`).
 pub(crate) fn program_svf(device: &str, jed: &Path) -> Result<(Vec<u8>, bool), Error> {
-    let data = std::fs::read(jed)
-        .map_err(|e| Error::Input(format!("cannot read {}: {e}", jed.display())))?;
+    let data = std::fs::read(jed).map_err(|e| Error::Input(format!("cannot read {}: {e}", jed.display())))?;
     let j = jedec::parse(&data)?;
-    let fam = j
-        .family()
-        .ok_or_else(|| Error::Input(format!("{}: not an ATF15xx JEDEC file", jed.display())))?;
+    let fam = j.family().ok_or_else(|| Error::Input(format!("{}: not an ATF15xx JEDEC file", jed.display())))?;
     let jtag_on = fam.jtag_fuse().is_none_or(|f| j.fuses[f] == b'1');
     let svf = one_device_svf(device, "pv", Some((jed, data)))?;
     Ok((svf, jtag_on))

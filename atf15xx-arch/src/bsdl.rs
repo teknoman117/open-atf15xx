@@ -95,16 +95,10 @@ pub fn part(name: &str) -> Result<&'static Part, String> {
     if let Some(p) = PARTS.iter().find(|p| p.name.eq_ignore_ascii_case(name)) {
         return Ok(p);
     }
-    if let Some((_, e)) = PART_ERRORS
-        .iter()
-        .find(|(n, _)| n.eq_ignore_ascii_case(name))
-    {
+    if let Some((_, e)) = PART_ERRORS.iter().find(|(n, _)| n.eq_ignore_ascii_case(name)) {
         return Err(e.to_string());
     }
-    Err(format!(
-        "no part {name} (known: {})",
-        PARTS.iter().map(|p| p.name).collect::<Vec<_>>().join(" ")
-    ))
+    Err(format!("no part {name} (known: {})", PARTS.iter().map(|p| p.name).collect::<Vec<_>>().join(" ")))
 }
 
 /// Every part with a boundary-register map.
@@ -115,11 +109,7 @@ pub fn parts() -> &'static [Part] {
 /// The BSDL files whose IDCODE matches `id` (e.g. `1508AS_J84.BSD`): identifies the die (the
 /// IDCODE names the device and voltage, not the package).
 pub fn identify(id: u32) -> Vec<&'static str> {
-    BSDL_IDCODES
-        .iter()
-        .filter(|(_, ids)| ids.contains(&id))
-        .map(|(f, _)| *f)
-        .collect()
+    BSDL_IDCODES.iter().filter(|(_, ids)| ids.contains(&id)).map(|(f, _)| *f).collect()
 }
 
 #[cfg(test)]
@@ -132,8 +122,6 @@ mod tests {
         assert_eq!(p.device, "P1508C84");
         assert_eq!(p.ir_len, 10);
         assert_eq!(p.length, p.cells.len());
-        assert!(identify(p.idcodes[0])
-            .iter()
-            .any(|f| f.eq_ignore_ascii_case(p.bsdl_file)));
+        assert!(identify(p.idcodes[0]).iter().any(|f| f.eq_ignore_ascii_case(p.bsdl_file)));
     }
 }

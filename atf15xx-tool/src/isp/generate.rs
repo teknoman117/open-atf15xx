@@ -2,9 +2,7 @@
 
 use crate::isp::bits::{bits, msb16, ones, prepend, zeros, Bits, UNDEF};
 use crate::isp::chain::{Chain, Device};
-use crate::isp::device::{
-    self, be_kind, is_as, is_atf150, is_be_or_re, is_unknown, op, BeKind, Family, Instr, VClass,
-};
+use crate::isp::device::{self, be_kind, is_as, is_atf150, is_be_or_re, is_unknown, op, BeKind, Family, Instr, VClass};
 use crate::isp::diag::{Diagnostics, Error};
 use crate::isp::fusemap::{DeviceImage, FuseMap};
 use crate::isp::jedec::{self, J1};
@@ -48,27 +46,16 @@ pub fn generate(
     for (i, d) in chain.devices.iter().enumerate() {
         let passive = matches!(d.instr, Instr::Bypass | Instr::NoneOrInvalid);
         if d.name.contains("1502SE") || (!device::is_accepted_name(&d.name) && !passive) {
-            return Err(Error::Input(format!(
-                "Unsupported device name '{}' for device # {}",
-                d.name,
-                i + 1
-            )));
+            return Err(Error::Input(format!("Unsupported device name '{}' for device # {}", d.name, i + 1)));
         }
         if d.name == "UNKNOWN" && !matches!(d.instr, Instr::Bypass | Instr::NoneOrInvalid) {
-            return Err(Error::Input(format!(
-                "Bypass must be selected for all UNKNOWN devices (device # {})",
-                i + 1
-            )));
+            return Err(Error::Input(format!("Bypass must be selected for all UNKNOWN devices (device # {})", i + 1)));
         }
     }
     // ---- §9.1 family / voltage mix ----
     let mut s = 0;
     for (cls, w) in [(VClass::V5, 5), (VClass::V3, 6), (VClass::BE, 7)] {
-        if chain
-            .devices
-            .iter()
-            .any(|d| device::voltage_class(&d.name) == Some(cls))
-        {
+        if chain.devices.iter().any(|d| device::voltage_class(&d.name) == Some(cls)) {
             s += w;
         }
     }
@@ -77,9 +64,7 @@ pub fn generate(
     }
     if s >= 8 {
         if !opts.allow_mixed_voltage {
-            return Err(Error::Input(format!(
-                "{V2}\n(use --allow-mixed-voltage to continue)"
-            )));
+            return Err(Error::Input(format!("{V2}\n(use --allow-mixed-voltage to continue)")));
         }
         diag.warn("Mixed voltage programming is not suggested!");
     }
@@ -97,9 +82,7 @@ pub fn generate(
                     return Err(Error::Input(J1.into()));
                 }
                 if let Some(jf) = fam.jtag_fuse() {
-                    if j.fuses[jf] != b'1'
-                        && matches!(d.instr, Instr::ProgramVerify | Instr::ProgramVerifySecure)
-                    {
+                    if j.fuses[jf] != b'1' && matches!(d.instr, Instr::ProgramVerify | Instr::ProgramVerifySecure) {
                         diag.warn(format!(
                             "JEDEC file for device # {x} has the JTAG port disabled; the device cannot be reprogrammed via JTAG afterwards"
                         ));
@@ -116,11 +99,7 @@ pub fn generate(
         }
         devs.push(Dev { d, image, security });
     }
-    let mut g = Gen {
-        devs: &devs,
-        s: Svf::new(opts.svf.clone()),
-        diag,
-    };
+    let mut g = Gen { devs: &devs, s: Svf::new(opts.svf.clone()), diag };
     g.run(&opts.ctime);
     let Gen { s, mut diag, .. } = g;
     // ---- §8 Load outputs ----
@@ -128,24 +107,14 @@ pub fn generate(
     if opts.load_output {
         for (i, dv) in devs.iter().enumerate() {
             if dv.d.instr == Instr::Load {
-                if let (Some(fam), Some(img)) =
-                    (device::expected_family(&dv.d.name), dv.image.as_ref())
-                {
-                    jedec_outputs.push((
-                        i + 1,
-                        dv.d.jed_path.clone(),
-                        jedout::write(fam, img, &opts.ctime),
-                    ));
+                if let (Some(fam), Some(img)) = (device::expected_family(&dv.d.name), dv.image.as_ref()) {
+                    jedec_outputs.push((i + 1, dv.d.jed_path.clone(), jedout::write(fam, img, &opts.ctime)));
                 }
             }
         }
     }
     diag.transcript.shrink_to_fit();
-    Ok(Output {
-        svf: s.into_bytes(),
-        jedec_outputs,
-        diag,
-    })
+    Ok(Output { svf: s.into_bytes(), jedec_outputs, diag })
 }
 
 struct Gen<'a> {
@@ -190,11 +159,7 @@ impl<'a> Gen<'a> {
     fn cdr(&self, x: usize, data: &[u8]) -> Bits {
         let mut s = Bits::new();
         for i in 1..=self.n() {
-            s = if i == x {
-                prepend(data, &s)
-            } else {
-                prepend(b"0", &s)
-            };
+            s = if i == x { prepend(data, &s) } else { prepend(b"0", &s) };
         }
         s
     }
@@ -202,11 +167,7 @@ impl<'a> Gen<'a> {
         let a = prepend(&bits(r, 8), prefix);
         let mut s = Bits::new();
         for i in 1..=self.n() {
-            s = if i == x {
-                prepend(&a, &s)
-            } else {
-                prepend(b"1", &s)
-            };
+            s = if i == x { prepend(&a, &s) } else { prepend(b"1", &s) };
         }
         s
     }
@@ -264,11 +225,7 @@ impl<'a> Gen<'a> {
         let (mut irs, mut id) = (Bits::new(), Bits::new());
         for i in 1..=self.n() {
             let n = self.name(i).to_string();
-            let a = if is_atf150(&n) {
-                ir(op::IDCODE)
-            } else {
-                ones(self.dev(i).d.ir_width as usize)
-            };
+            let a = if is_atf150(&n) { ir(op::IDCODE) } else { ones(self.dev(i).d.ir_width as usize) };
             let e = match device::idcode(&n) {
                 Some(v) => bits(v as u64, 32),
                 None if self.s.opt.strict && is_unknown(&n) => b"0".to_vec(), // D4 corrected
@@ -419,10 +376,7 @@ impl<'a> Gen<'a> {
         match be_kind(self.name(x)) {
             BeKind::K1502 => vec![(0x40, 0x81E, 0x829, 0, false)],
             BeKind::K1504 => vec![(0x83, 0x1080, 0x109B, 0, false)],
-            BeKind::K1508 => vec![
-                (0x95, 0x12C0, 0x12CB, 0, false),
-                (0x88, 0x1120, 0x113D, 4812, true),
-            ],
+            BeKind::K1508 => vec![(0x95, 0x12C0, 0x12CB, 0, false), (0x88, 0x1120, 0x113D, 4812, true)],
         }
     }
     fn be_program(&mut self, x: usize) {
@@ -615,16 +569,12 @@ impl<'a> Gen<'a> {
     // ---- §7.1 ----
     fn run(&mut self, ctime: &str) {
         self.s.header(ctime);
-        self.diag
-            .log("...  executing JTAG instructions...please wait...");
+        self.diag.log("...  executing JTAG instructions...please wait...");
         self.init();
         self.isc(true);
         self.idcode_scan();
         for x in 1..=self.n() {
-            if matches!(
-                self.dev(x).d.instr,
-                Instr::Erase | Instr::ProgramVerify | Instr::ProgramVerifySecure
-            ) {
+            if matches!(self.dev(x).d.instr, Instr::Erase | Instr::ProgramVerify | Instr::ProgramVerifySecure) {
                 self.erase(x);
                 self.diag.log(format!("log: erasing device #{x}."));
                 self.reinit();
@@ -634,16 +584,16 @@ impl<'a> Gen<'a> {
             let instr = self.dev(x).d.instr;
             let be = is_be_or_re(self.name(x)) && !is_as(self.name(x));
             let w7 = |i: &str| {
-                format!("log: warning: SVF generation procedure cannot be used with {i} procedure together.  This is the software limitation.")
+                format!(
+                    "log: warning: SVF generation procedure cannot be used with {i} procedure together.  This is the software limitation."
+                )
             };
             match instr {
                 Instr::Load => {
                     self.reinit();
                     self.verify_secure(x);
                     if be {
-                        self.diag.log(format!(
-                            "warning: Device #{x} is secured, output jedec is blank."
-                        ));
+                        self.diag.log(format!("warning: Device #{x} is secured, output jedec is blank."));
                         self.diag.run_failed = true;
                     }
                     self.diag.log(format!("log: reading device #{x}."));
@@ -653,8 +603,7 @@ impl<'a> Gen<'a> {
                     self.diag.log(format!("log: programming device #{x}."));
                     self.program(x);
                     self.verify(x);
-                    self.diag
-                        .log(format!("log: verifying device #{x}: ... OK ..."));
+                    self.diag.log(format!("log: verifying device #{x}: ... OK ..."));
                     if self.dev(x).security == b'1' {
                         self.secure(x);
                     }
@@ -663,71 +612,52 @@ impl<'a> Gen<'a> {
                     self.diag.log(format!("log: programming device #{x}."));
                     self.program(x);
                     self.verify(x);
-                    self.diag
-                        .log(format!("log: verifying device #{x}: ... OK ..."));
+                    self.diag.log(format!("log: verifying device #{x}: ... OK ..."));
                     self.diag.log(format!("log: securing device #{x}."));
                     self.secure(x);
-                    self.diag
-                        .log(format!("log: verifying secure for device #{x}:"));
+                    self.diag.log(format!("log: verifying secure for device #{x}:"));
                     self.reinit();
                     self.verify_secure(x);
                     self.diag.log(w7("Program/Verify/Secure"));
-                    self.diag.warn(
-                        w7("Program/Verify/Secure")
-                            .trim_start_matches("log: ")
-                            .to_string(),
-                    );
+                    self.diag.warn(w7("Program/Verify/Secure").trim_start_matches("log: ").to_string());
                 }
                 Instr::Secure => {
                     self.diag.log(format!("log: securing device #{x}."));
                     self.secure(x);
-                    self.diag
-                        .log(format!("log: verifying if device #{x} secured:"));
+                    self.diag.log(format!("log: verifying if device #{x} secured:"));
                     self.reinit();
                     self.verify_secure(x);
                     self.diag.log(w7("Secure"));
-                    self.diag
-                        .warn(w7("Secure").trim_start_matches("log: ").to_string());
+                    self.diag.warn(w7("Secure").trim_start_matches("log: ").to_string());
                 }
                 Instr::Verify => {
                     self.verify(x);
-                    self.diag
-                        .log(format!("log: verifying device #{x}: ... OK ..."));
+                    self.diag.log(format!("log: verifying device #{x}: ... OK ..."));
                 }
                 Instr::VerifySecure => {
-                    self.diag
-                        .log(format!("log: verifying secure for device #{x}:"));
+                    self.diag.log(format!("log: verifying secure for device #{x}:"));
                     self.reinit();
                     self.verify_secure(x);
                     self.diag.log(w7("Verify Secure"));
-                    self.diag
-                        .warn(w7("Verify Secure").trim_start_matches("log: ").to_string());
+                    self.diag.warn(w7("Verify Secure").trim_start_matches("log: ").to_string());
                 }
                 Instr::BlankCheck => {
                     self.verify(x);
                     self.reinit();
                     self.verify_secure(x);
                     if be {
-                        self.diag.log(format!(
-                            "log: blank check device #{x}: ... failed blank check since device is secured ..."
-                        ));
+                        self.diag.log(format!("log: blank check device #{x}: ... failed blank check since device is secured ..."));
                         self.diag.run_failed = true;
                     } else {
-                        self.diag.log(format!(
-                            "log: blank check device #{x}: ... OK ...device is blank."
-                        ));
+                        self.diag.log(format!("log: blank check device #{x}: ... OK ...device is blank."));
                     }
                 }
                 Instr::Erase => {
                     self.verify(x);
-                    self.diag.log(format!(
-                        "log: blank check device #{x}: ... OK ...device is blank."
-                    ));
+                    self.diag.log(format!("log: blank check device #{x}: ... OK ...device is blank."));
                 }
                 Instr::ReadUes => {
-                    self.diag.log(format!(
-                        "log: read User Electronic Signature from device #{x}:"
-                    ));
+                    self.diag.log(format!("log: read User Electronic Signature from device #{x}:"));
                     self.read_ues(x);
                     self.diag.log("     UES = \"");
                 }

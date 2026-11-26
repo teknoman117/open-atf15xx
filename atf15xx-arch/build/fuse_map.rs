@@ -44,18 +44,10 @@ fn option_fuses(bit: &str, fuses: &[u64]) -> Vec<u64> {
 
 fn source_name(name: &str) -> String {
     let blk = |n: usize| BLOCKS.as_bytes()[(n - 1) / 16] as char;
-    if let Some(n) = name
-        .strip_prefix("MC")
-        .and_then(|r| r.strip_suffix("_FB"))
-        .and_then(|n| n.parse().ok())
-    {
+    if let Some(n) = name.strip_prefix("MC").and_then(|r| r.strip_suffix("_FB")).and_then(|n| n.parse().ok()) {
         return format!("{}{}fb", blk(n), n);
     }
-    if let Some(n) = name
-        .strip_prefix('M')
-        .and_then(|r| r.strip_suffix("_PAD"))
-        .and_then(|n| n.parse::<usize>().ok())
-    {
+    if let Some(n) = name.strip_prefix('M').and_then(|r| r.strip_suffix("_PAD")).and_then(|n| n.parse::<usize>().ok()) {
         return format!("{}{}p", blk(n), n);
     }
     match name {
@@ -69,9 +61,7 @@ fn source_name(name: &str) -> String {
 }
 
 fn fuses_of(v: &Value) -> Vec<u64> {
-    v.as_array()
-        .map(|a| a.iter().filter_map(Value::as_u64).collect())
-        .unwrap_or_default()
+    v.as_array().map(|a| a.iter().filter_map(Value::as_u64).collect()).unwrap_or_default()
 }
 
 /// The inputs of a one-hot-zero mux by position.
@@ -99,12 +89,7 @@ fn mux_row(mux: &Value, problems: &mut Vec<String>, what: &str) -> (usize, Vec<O
 pub fn family(dev: &Value, fam: &str) -> (Fam, Vec<String>) {
     let mut problems = vec![];
     let nb = dev["blocks"].as_object().unwrap().len();
-    let widths: BTreeSet<usize> = dev["switches"]
-        .as_object()
-        .unwrap()
-        .values()
-        .map(|s| fuses_of(&s["mux"]["fuses"]).len())
-        .collect();
+    let widths: BTreeSet<usize> = dev["switches"].as_object().unwrap().values().map(|s| fuses_of(&s["mux"]["fuses"]).len()).collect();
     assert_eq!(widths.len(), 1, "{fam}: UIM widths {widths:?}");
     let width = *widths.iter().next().unwrap();
     let qf = dev["ranges"]["reserved"][1].as_u64().unwrap() as usize;
@@ -121,10 +106,7 @@ pub fn family(dev: &Value, fam: &str) -> (Fam, Vec<String>) {
             if fuses.is_empty() {
                 continue;
             }
-            by_pair
-                .entry(pair)
-                .or_default()
-                .extend(option_fuses(bit, &fuses));
+            by_pair.entry(pair).or_default().extend(option_fuses(bit, &fuses));
         }
         for (pair, fuses) in by_pair {
             let s = if forward(pair) { l } else { 15 - l } as u64;
@@ -137,11 +119,7 @@ pub fn family(dev: &Value, fam: &str) -> (Fam, Vec<String>) {
     let mut mcfg = BTreeMap::new();
     for (key, cands) in &bases {
         if cands.len() != 1 {
-            problems.push(format!(
-                "block {} field {:?}: inconsistent bases {cands:?}",
-                BLOCKS.as_bytes()[key.0] as char,
-                key.1
-            ));
+            problems.push(format!("block {} field {:?}: inconsistent bases {cands:?}", BLOCKS.as_bytes()[key.0] as char, key.1));
             continue;
         }
         mcfg.insert(*key, *cands.keys().next().unwrap() as usize);
@@ -161,9 +139,7 @@ pub fn family(dev: &Value, fam: &str) -> (Fam, Vec<String>) {
             let s = if forward(pair) { l } else { 15 - l };
             let a = (base + 2 * s + (usize::from(k) ^ (s & 1))) as u64;
             if !option_fuses(bit, &fuses).contains(&a) {
-                problems.push(format!(
-                    "MC{mc} {bit}: expected fuse {a}, database has {fuses:?}"
-                ));
+                problems.push(format!("MC{mc} {bit}: expected fuse {a}, database has {fuses:?}"));
             }
         }
     }
@@ -178,11 +154,7 @@ pub fn family(dev: &Value, fam: &str) -> (Fam, Vec<String>) {
                 continue;
             };
             let k = (col.as_u64().unwrap() as usize - 16) / 2;
-            let (base, row) = mux_row(
-                &dev["switches"][sw]["mux"],
-                &mut problems,
-                &format!("{bn} mux {k}"),
-            );
+            let (base, row) = mux_row(&dev["switches"][sw]["mux"], &mut problems, &format!("{bn} mux {k}"));
             uim_fields.insert((b, k), base);
             rows.entry(k).or_default().push((bn.clone(), row));
         }
@@ -194,10 +166,7 @@ pub fn family(dev: &Value, fam: &str) -> (Fam, Vec<String>) {
             for (i, s) in row.iter().enumerate() {
                 let Some(s) = s else { continue };
                 if merged[i].as_ref().is_some_and(|m| m != s) {
-                    problems.push(format!(
-                        "mux {k} position {i}: {:?} vs {s} (block {bn})",
-                        merged[i]
-                    ));
+                    problems.push(format!("mux {k} position {i}: {:?} vs {s} (block {bn})", merged[i]));
                 }
                 merged[i] = Some(s.clone());
             }
@@ -220,20 +189,7 @@ pub fn family(dev: &Value, fam: &str) -> (Fam, Vec<String>) {
         let ours = if fam == "1502" { 6 - idx } else { idx + 1 };
         goe_table[ours - 1] = row;
     }
-    (
-        Fam {
-            number: fam.into(),
-            qf,
-            blocks: nb,
-            uim_width: width,
-            mcfg,
-            uim_fields,
-            uim_table,
-            goe_table,
-            inferred: vec![],
-        },
-        problems,
-    )
+    (Fam { number: fam.into(), qf, blocks: nb, uim_width: width, mcfg, uim_fields, uim_table, goe_table, inferred: vec![] }, problems)
 }
 
 /// Fill missing macrocell fields from a rule that holds in the reference family: a missing field
@@ -252,18 +208,14 @@ pub fn infer_fields(out: &mut Fam, reference: &Fam, problems: &mut Vec<String>) 
                 let Some(&qa) = out.mcfg.get(&(b, q)) else {
                     continue;
                 };
-                let deltas: BTreeSet<i64> = (0..reference.blocks)
-                    .map(|rb| reference.mcfg[&(rb, p)] as i64 - reference.mcfg[&(rb, q)] as i64)
-                    .collect();
+                let deltas: BTreeSet<i64> =
+                    (0..reference.blocks).map(|rb| reference.mcfg[&(rb, p)] as i64 - reference.mcfg[&(rb, q)] as i64).collect();
                 if deltas.len() != 1 {
                     continue;
                 }
                 let addr = (qa as i64 + *deltas.iter().next().unwrap()) as usize;
                 if (addr..addr + 32).any(|a| taken.contains(&a)) {
-                    problems.push(format!(
-                        "block {} field {p:?}: inferred {addr} overlaps a field",
-                        BLOCKS.as_bytes()[b] as char
-                    ));
+                    problems.push(format!("block {} field {p:?}: inferred {addr} overlaps a field", BLOCKS.as_bytes()[b] as char));
                     done = true;
                     break;
                 }
@@ -278,10 +230,7 @@ pub fn infer_fields(out: &mut Fam, reference: &Fam, problems: &mut Vec<String>) 
                 break;
             }
             if !done {
-                problems.push(format!(
-                    "block {} field {p:?}: not determined",
-                    BLOCKS.as_bytes()[b] as char
-                ));
+                problems.push(format!("block {} field {p:?}: not determined", BLOCKS.as_bytes()[b] as char));
             }
         }
     }
@@ -306,27 +255,12 @@ pub fn emit(fams: &[Fam]) -> String {
     for f in fams {
         let mut fields: Vec<_> = f.mcfg.iter().map(|(&(b, p), &a)| (a, b, p)).collect();
         fields.sort();
-        let fields: Vec<String> = fields
-            .iter()
-            .map(|(a, b, p)| {
-                format!(
-                    "McField {{ addr: {a}, block: {b}, pair: [{}, {}] }}",
-                    p.0, p.1
-                )
-            })
-            .collect();
-        let uim: Vec<String> = (0..f.blocks)
-            .flat_map(|b| (0..40).map(move |k| (b, k)))
-            .map(|key| f.uim_fields[&key].to_string())
-            .collect();
+        let fields: Vec<String> =
+            fields.iter().map(|(a, b, p)| format!("McField {{ addr: {a}, block: {b}, pair: [{}, {}] }}", p.0, p.1)).collect();
+        let uim: Vec<String> = (0..f.blocks).flat_map(|b| (0..40).map(move |k| (b, k))).map(|key| f.uim_fields[&key].to_string()).collect();
         let table = |t: &Vec<Vec<Option<String>>>| -> String {
             t.iter()
-                .map(|r| {
-                    format!(
-                        "&[{}]",
-                        r.iter().map(source_expr).collect::<Vec<_>>().join(", ")
-                    )
-                })
+                .map(|r| format!("&[{}]", r.iter().map(source_expr).collect::<Vec<_>>().join(", ")))
                 .collect::<Vec<_>>()
                 .join(",\n        ")
         };

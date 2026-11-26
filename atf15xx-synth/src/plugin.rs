@@ -138,11 +138,7 @@ fn bits(b: &[i64]) -> Vec<Bit> {
 pub fn netlist(mods: &[ModuleRec]) -> Netlist {
     let mut modules = BTreeMap::new();
     for m in mods {
-        let ports = m
-            .ports
-            .iter()
-            .map(|p| (p.name.clone(), ynet::Port { direction: p.dir.clone(), bits: bits(&p.bits) }))
-            .collect();
+        let ports = m.ports.iter().map(|p| (p.name.clone(), ynet::Port { direction: p.dir.clone(), bits: bits(&p.bits) })).collect();
         let cells = m
             .cells
             .iter()
@@ -258,7 +254,8 @@ fn synth_and_fit(mut design: Pin<&mut Design>, a: &FitArgs) -> Result<String, St
         }
         // 2. the fits, in parallel (pure Rust), compared in order
         use rayon::prelude::*;
-        let fits: Vec<Result<flow::Outputs, String>> = netlists.par_iter().map(|n| flow::fit_netlist(n, &o, "yosys synth_atf15xx")).collect();
+        let fits: Vec<Result<flow::Outputs, String>> =
+            netlists.par_iter().map(|n| flow::fit_netlist(n, &o, "yosys synth_atf15xx")).collect();
         let mut best: Option<(usize, flow::Outputs)> = None;
         let mut errs = vec![];
         for (k, (mode, fit)) in modes.iter().zip(fits).enumerate() {

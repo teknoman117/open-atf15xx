@@ -19,9 +19,7 @@ fn select(v: &[String]) -> Select {
     match on(v) {
         Some(true) => Select::All,
         Some(false) => Select::Off,
-        None => Select::Only(
-            v.iter().flat_map(|s| s.split(',')).filter(|s| !s.is_empty() && *s != "=").map(String::from).collect(),
-        ),
+        None => Select::Only(v.iter().flat_map(|s| s.split(',')).filter(|s| !s.is_empty() && *s != "=").map(String::from).collect()),
     }
 }
 
@@ -79,9 +77,8 @@ pub fn apply(o: &mut Options, key: &str, v: &[String]) -> bool {
         }
         // accepted and ignored (no effect on the bitstream in the cases studied)
         "xor_synthesis" => o.xor_synthesis = b(true),
-        "global_fold" | "optimize" | "soft_buffer" | "latch_synthesis"
-        | "push_gate" | "verilog_sim" | "vhdl_sim" | "out_edif" | "tpd" | "fast_inlatch" | "debug" | "global_oe"
-        | "oe_node" | "twoclock" | "ifmt" | "lib" | "pinfile" | "c" => {}
+        "global_fold" | "optimize" | "soft_buffer" | "latch_synthesis" | "push_gate" | "verilog_sim" | "vhdl_sim" | "out_edif" | "tpd"
+        | "fast_inlatch" | "debug" | "global_oe" | "oe_node" | "twoclock" | "ifmt" | "lib" | "pinfile" | "c" => {}
         _ => return false,
     }
     true

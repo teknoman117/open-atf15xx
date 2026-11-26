@@ -56,13 +56,7 @@ fn contains(h: &[u8], n: &[u8]) -> bool {
 
 /// Parse a JEDEC file per §3.2–§3.4. Errors are J2-class conditions.
 pub fn parse(data: &[u8]) -> Result<Jedec, Error> {
-    let mut j = Jedec {
-        qf: None,
-        fuses: Vec::new(),
-        default: b'0',
-        security: b'0',
-        stated_checksum: None,
-    };
+    let mut j = Jedec { qf: None, fuses: Vec::new(), default: b'0', security: b'0', stated_checksum: None };
     let mut fz: Option<Vec<u8>> = None;
     let mut fields: Vec<&[u8]> = data.split(|&b| b == b'*').collect();
     // the remainder after the last '*' is also a field (it is read by getline at EOF)
@@ -89,9 +83,7 @@ fn process_field(raw: &[u8], j: &mut Jedec, fz: &mut Option<Vec<u8>>) -> Result<
         if contains(raw, b"NOTE") || contains(raw, b"Note") {
             return Ok(());
         }
-        let start = raw
-            .iter()
-            .position(|&c| c.is_ascii_alphanumeric() || c == 2 || c == 3);
+        let start = raw.iter().position(|&c| c.is_ascii_alphanumeric() || c == 2 || c == 3);
         let Some(start) = start else { return Ok(()) };
         // §3.2 step 3: ATMISP copies 200 bytes into an unterminated buffer; fields of 200 bytes or
         // more (from the identifier) are undefined behaviour and are rejected (J2).

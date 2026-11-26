@@ -80,7 +80,11 @@ fn bus_cycle_drives_inputs_and_reads_back() {
         r#"{{"cells": [{{"name": "led", "mc": {led_mc}, "pin": {led}, "registered": false}}],
             "inputs": [{{"name": "d[0]", "pin": {}}}, {{"name": "d[1]", "pin": {}}}, {{"name": "d[2]", "pin": {}}},
                        {{"name": "d[3]", "pin": {}}}, {{"name": "wr_n", "pin": {}}}]}}"#,
-        pins[0], pins[1], pins[2], pins[3], pins[4],
+        pins[0],
+        pins[1],
+        pins[2],
+        pins[3],
+        pins[4],
         led = pins[5],
         led_mc = part.cells.iter().find(|c| c.kind == CellKind::In && c.pin == Some(pins[5])).unwrap().mc.unwrap(),
     ))

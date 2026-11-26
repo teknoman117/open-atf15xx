@@ -131,11 +131,7 @@ impl<'m> Sim<'m> {
                 }
             }
             self.pad = pad;
-            let fold: Vec<bool> = m
-                .mcs
-                .iter()
-                .map(|mc| if mc.pt_use[0] == PtUse::Foldback { !self.pt(mc, 0) } else { true })
-                .collect();
+            let fold: Vec<bool> = m.mcs.iter().map(|mc| if mc.pt_use[0] == PtUse::Foldback { !self.pt(mc, 0) } else { true }).collect();
             let mut sums = vec![false; n];
             for i in 0..n {
                 sums[i] = self.sum(&m.mcs[i], &sums);

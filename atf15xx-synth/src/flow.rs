@@ -177,7 +177,14 @@ impl Default for FlowOptions {
 /// Run Yosys: Verilog files → JSON netlist (`<out>/<top>.json`, log in `<out>/yosys.log`).
 /// Run Yosys for each mapping `map` stands for (`auto`: gates and words), writing
 /// `netlist.json` (gates, abc) and/or `netlist-words.json`.
-pub fn synth_all(files: &[PathBuf], top: Option<&str>, out: &Path, yosys: &str, init: InitPolicy, map: MapMode) -> Result<Vec<(MapMode, PathBuf)>, String> {
+pub fn synth_all(
+    files: &[PathBuf],
+    top: Option<&str>,
+    out: &Path,
+    yosys: &str,
+    init: InitPolicy,
+    map: MapMode,
+) -> Result<Vec<(MapMode, PathBuf)>, String> {
     let modes = if map == MapMode::Auto { vec![MapMode::None, MapMode::Words] } else { vec![map] };
     // the Yosys runs are independent processes: run them side by side (spec F9.11)
     std::thread::scope(|s| {
@@ -216,12 +223,7 @@ pub fn synth(files: &[PathBuf], top: Option<&str>, out: &Path, yosys: &str, init
         Some(t) => format!("hierarchy -check -top {t};"),
         None => "hierarchy -check -auto-top;".into(),
     };
-    let cmd = format!(
-        "{} {hier} script {}; stat; write_json -compat-int {}",
-        reads.join(" "),
-        shell_word(&script),
-        shell_word(&json)
-    );
+    let cmd = format!("{} {hier} script {}; stat; write_json -compat-int {}", reads.join(" "), shell_word(&script), shell_word(&json));
     let st = Command::new(yosys)
         .current_dir(&base)
         .args(["-q", "-l"])
@@ -365,7 +367,9 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
     let regs = imp.design.cells.iter().filter(|c| c.storage != atf15xx_fit::netlist::Storage::Comb).count();
     let mcs = part.device.family.macrocells();
     if regs > mcs {
-        return Err(format!("fit failed: {regs} registers need at least {regs} macrocells (one flip-flop each), the {part_name} has {mcs}"));
+        return Err(format!(
+            "fit failed: {regs} registers need at least {regs} macrocells (one flip-flop each), the {part_name} has {mcs}"
+        ));
     }
     // likewise pins: outputs need I/O pins, inputs any pin
     let (outs, ins) = (imp.design.cells.iter().filter(|c| c.is_output).count(), imp.design.inputs.len());
@@ -420,7 +424,17 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
         })
         .collect::<Result<_, _>>()?;
     let mp = o.max_products;
-    let base = Strategy { mp, ties: true, enables: true, spread: false, seed: 0, vcollapse: false, toggles: o.toggles, special_foldback: opts.special_foldback, fold_one_level: false };
+    let base = Strategy {
+        mp,
+        ties: true,
+        enables: true,
+        spread: false,
+        seed: 0,
+        vcollapse: false,
+        toggles: o.toggles,
+        special_foldback: opts.special_foldback,
+        fold_one_level: false,
+    };
     let s = |mp: usize, ties: bool, enables: bool, spread: bool| Strategy { mp, ties, enables, spread, ..base };
     let plain: Vec<Strategy> = vec![
         s(mp, true, true, false),
@@ -435,7 +449,13 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
     // then the same with the cells in shuffled orders (the fitter places in netlist order)
     let seeds: u64 = std::env::var("ATF15XX_FLOW_SEEDS").ok().and_then(|v| v.parse().ok()).unwrap_or(8);
     let shuffled: Vec<Strategy> = (1..=seeds)
-        .flat_map(|k| [Strategy { seed: k, ..s(mp, true, true, true) }, Strategy { seed: k, ..s(mp, true, true, false) }, Strategy { seed: k, ..s(5, true, true, true) }])
+        .flat_map(|k| {
+            [
+                Strategy { seed: k, ..s(mp, true, true, true) },
+                Strategy { seed: k, ..s(mp, true, true, false) },
+                Strategy { seed: k, ..s(5, true, true, true) },
+            ]
+        })
         .collect();
     // dense designs: when there are more cells than macrocells, also try the fitter's vendor-style
     // collapse of combinatorial nodes into their readers (what makes the .tt2 path fit such
@@ -513,139 +533,152 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
     let run = |st: Strategy, si: usize| -> Result<Outcome, String> {
         let t_pass = std::time::Instant::now();
         let Strategy { mp, ties, enables, spread, seed, vcollapse, toggles, special_foldback, fold_one_level } = st;
-            // the netlist passes up to the split depend only on these knobs: computed once per
-            // key and shared by the strategies (and threads) that need them (spec F9.11)
-            let key = (mp, toggles, enables, ties);
-            let slot = prefix_cache.lock().expect("prefix cache").entry(key).or_insert_with(|| std::sync::Arc::new(std::sync::OnceLock::new())).clone();
-            let (pd, plog) = slot.get_or_init(|| {
-                let mut d = base.clone();
-                let mut log: Vec<String> = vec![];
-                // with ATF15XX_FLOW_DEBUG or ATF15XX_FLOW_TIMING, the time of each netlist pass
-                let dbg = std::env::var_os("ATF15XX_FLOW_DEBUG").is_some() || std::env::var_os("ATF15XX_FLOW_TIMING").is_some();
-                let mut tp = std::time::Instant::now();
-                let mut lap = |what: &str| {
-                    if dbg {
-                        eprintln!("pass {what}: {:.2} s", tp.elapsed().as_secs_f64());
-                    }
-                    tp = std::time::Instant::now();
-                };
-                    if toggles {
-                        log.push(format!("{} T flip-flops", opt::recover_toggles(&mut d, mp)));
-                        opt::remove_dead(&mut d);
-                        let chains = opt::factor_wide(&mut d);
-                        if chains > 0 {
-                            log.push(format!("{chains} carry-chain nodes"));
-                        }
-                        lap("toggles");
-                    }
-                    if enables {
-                        log.push(format!("{} clock enables", opt::recover_enables(&mut d, mp)));
-                        opt::remove_dead(&mut d);
-                        lap("enables");
-                    }
-                    if let (Some(n), Some(c)) = (std::env::var("ATF15XX_FLOW_TRACE").ok(), None::<()>.or(Some(()))) {
-                        let _ = c;
-                        if let Some(cell) = d.cell(&n) {
-                            eprintln!("trace {n} before collapse: data {:?} ce {:?}", cell.data, cell.ce);
-                        }
-                    }
-                    opt::collapse_limited(&mut d, mp, ties);
-                    lap("collapse");
-                    if let Ok(n) = std::env::var("ATF15XX_FLOW_TRACE") {
-                        if let Some(cell) = d.cell(&n) {
-                            eprintln!("trace {n} after collapse: data {:?} ce {:?}", cell.data, cell.ce);
-                        }
-                    }
-                    opt::recover_latch_resets(&mut d);
-                    opt::remove_dead(&mut d);
-                    let splits = opt::split_large(&mut d, mp);
-                    if splits > 0 {
-                        log.push(format!("{splits} OR nodes split off"));
-                    }
-                    lap("split");
-                (d, log)
-            });
-            let mut d = pd.clone();
-            let mut log = plog.clone();
-            let t = if o.emit_tt2 { Some(tt2out::write(&d, &part.device.tt2_device)?) } else { None };
-            let tv = std::time::Instant::now();
-            let timing = std::env::var_os("ATF15XX_FLOW_TIMING").is_some();
-            if vcollapse {
-                // shared nodes feeding control functions become foldback signals first (the vendor's
-                // XXL_ nodes): they stay shared instead of being expanded into every reader.
-                // 1. flatten the gate trees into those nodes (collapse everything else into them)
-                use atf15xx_fit::{logic::Signal as Sg, netlist::Storage as St};
-                let feeds_control: std::collections::BTreeSet<String> = d
-                    .cells
-                    .iter()
-                    .flat_map(|o| [&o.clk, &o.ce, &o.ar, &o.ap, &o.oe].into_iter().flatten().flat_map(|f| f.signals()))
-                    .filter_map(|s| if let Sg::Fb(n, false) = s { Some(n) } else { None })
-                    .collect();
-                let mut held = vec![];
-                for c in d.cells.iter_mut() {
-                    if !c.is_output && c.storage == St::Comb {
-                        if feeds_control.contains(&c.name) && c.node.is_none() {
-                            c.node = Some(0);
-                            held.push(c.name.clone());
-                        } else if !feeds_control.contains(&c.name) && c.node == Some(0) {
-                            c.node = None;
-                        }
-                    }
+        // the netlist passes up to the split depend only on these knobs: computed once per
+        // key and shared by the strategies (and threads) that need them (spec F9.11)
+        let key = (mp, toggles, enables, ties);
+        let slot = prefix_cache
+            .lock()
+            .expect("prefix cache")
+            .entry(key)
+            .or_insert_with(|| std::sync::Arc::new(std::sync::OnceLock::new()))
+            .clone();
+        let (pd, plog) = slot.get_or_init(|| {
+            let mut d = base.clone();
+            let mut log: Vec<String> = vec![];
+            // with ATF15XX_FLOW_DEBUG or ATF15XX_FLOW_TIMING, the time of each netlist pass
+            let dbg = std::env::var_os("ATF15XX_FLOW_DEBUG").is_some() || std::env::var_os("ATF15XX_FLOW_TIMING").is_some();
+            let mut tp = std::time::Instant::now();
+            let mut lap = |what: &str| {
+                if dbg {
+                    eprintln!("pass {what}: {:.2} s", tp.elapsed().as_secs_f64());
                 }
-                d.collapse_comb_nodes();
-                for c in d.cells.iter_mut() {
-                    if held.contains(&c.name) || (feeds_control.contains(&c.name) && c.node == Some(0)) {
-                        c.node = None;
-                    }
+                tp = std::time::Instant::now();
+            };
+            if toggles {
+                log.push(format!("{} T flip-flops", opt::recover_toggles(&mut d, mp)));
+                opt::remove_dead(&mut d);
+                let chains = opt::factor_wide(&mut d);
+                if chains > 0 {
+                    log.push(format!("{chains} carry-chain nodes"));
                 }
-                // 2. convert them
-                // (only with foldback signals: otherwise they stay macrocell nodes, one UIM pass)
-                let nf = if special_foldback { d.nodes_to_foldbacks_with(4, fold_one_level) } else { 0 };
-                if nf > 0 {
-                    log.push(format!("{nf} nodes as foldback signals"));
-                }
-                // the flow's own collapse pinned the nodes it rejected (node marker 0); let the
-                // fitter's vendor-style collapse (bounded by the 40 UIM inputs) decide instead
-                for c in d.cells.iter_mut() {
-                    if !c.is_output && c.storage == atf15xx_fit::netlist::Storage::Comb && c.node == Some(0) {
-                        c.node = None;
-                    }
-                }
-                d.collapse_comb_nodes();
-                if timing {
-                    eprintln!("strategy {si}: vendor-style collapse: {:.2} s", tv.elapsed().as_secs_f64());
-                }
-                log.push("vendor-style node collapse".into());
+                lap("toggles");
             }
-            let tq = std::time::Instant::now();
-            d.absorb_output_registers();
-            let ta = tq.elapsed().as_secs_f64();
-            d.legalize_special_functions_with(special_foldback);
+            if enables {
+                log.push(format!("{} clock enables", opt::recover_enables(&mut d, mp)));
+                opt::remove_dead(&mut d);
+                lap("enables");
+            }
+            if let (Some(n), Some(c)) = (std::env::var("ATF15XX_FLOW_TRACE").ok(), None::<()>.or(Some(()))) {
+                let _ = c;
+                if let Some(cell) = d.cell(&n) {
+                    eprintln!("trace {n} before collapse: data {:?} ce {:?}", cell.data, cell.ce);
+                }
+            }
+            opt::collapse_limited(&mut d, mp, ties);
+            lap("collapse");
+            if let Ok(n) = std::env::var("ATF15XX_FLOW_TRACE") {
+                if let Some(cell) = d.cell(&n) {
+                    eprintln!("trace {n} after collapse: data {:?} ce {:?}", cell.data, cell.ce);
+                }
+            }
+            opt::recover_latch_resets(&mut d);
+            opt::remove_dead(&mut d);
+            let splits = opt::split_large(&mut d, mp);
+            if splits > 0 {
+                log.push(format!("{splits} OR nodes split off"));
+            }
+            lap("split");
+            (d, log)
+        });
+        let mut d = pd.clone();
+        let mut log = plog.clone();
+        let t = if o.emit_tt2 { Some(tt2out::write(&d, &part.device.tt2_device)?) } else { None };
+        let tv = std::time::Instant::now();
+        let timing = std::env::var_os("ATF15XX_FLOW_TIMING").is_some();
+        if vcollapse {
+            // shared nodes feeding control functions become foldback signals first (the vendor's
+            // XXL_ nodes): they stay shared instead of being expanded into every reader.
+            // 1. flatten the gate trees into those nodes (collapse everything else into them)
+            use atf15xx_fit::{logic::Signal as Sg, netlist::Storage as St};
+            let feeds_control: std::collections::BTreeSet<String> = d
+                .cells
+                .iter()
+                .flat_map(|o| [&o.clk, &o.ce, &o.ar, &o.ap, &o.oe].into_iter().flatten().flat_map(|f| f.signals()))
+                .filter_map(|s| if let Sg::Fb(n, false) = s { Some(n) } else { None })
+                .collect();
+            let mut held = vec![];
+            for c in d.cells.iter_mut() {
+                if !c.is_output && c.storage == St::Comb {
+                    if feeds_control.contains(&c.name) && c.node.is_none() {
+                        c.node = Some(0);
+                        held.push(c.name.clone());
+                    } else if !feeds_control.contains(&c.name) && c.node == Some(0) {
+                        c.node = None;
+                    }
+                }
+            }
+            d.collapse_comb_nodes();
+            for c in d.cells.iter_mut() {
+                if held.contains(&c.name) || (feeds_control.contains(&c.name) && c.node == Some(0)) {
+                    c.node = None;
+                }
+            }
+            // 2. convert them
+            // (only with foldback signals: otherwise they stay macrocell nodes, one UIM pass)
+            let nf = if special_foldback { d.nodes_to_foldbacks_with(4, fold_one_level) } else { 0 };
+            if nf > 0 {
+                log.push(format!("{nf} nodes as foldback signals"));
+            }
+            // the flow's own collapse pinned the nodes it rejected (node marker 0); let the
+            // fitter's vendor-style collapse (bounded by the 40 UIM inputs) decide instead
+            for c in d.cells.iter_mut() {
+                if !c.is_output && c.storage == atf15xx_fit::netlist::Storage::Comb && c.node == Some(0) {
+                    c.node = None;
+                }
+            }
+            d.collapse_comb_nodes();
             if timing {
-                eprintln!("pass absorb: {ta:.2} s, legalize: {:.2} s", tq.elapsed().as_secs_f64() - ta);
+                eprintln!("strategy {si}: vendor-style collapse: {:.2} s", tv.elapsed().as_secs_f64());
             }
-            if seed > 0 {
-                shuffle(&mut d.cells, seed);
+            log.push("vendor-style node collapse".into());
+        }
+        let tq = std::time::Instant::now();
+        d.absorb_output_registers();
+        let ta = tq.elapsed().as_secs_f64();
+        d.legalize_special_functions_with(special_foldback);
+        if timing {
+            eprintln!("pass absorb: {ta:.2} s, legalize: {:.2} s", tq.elapsed().as_secs_f64() - ta);
+        }
+        if seed > 0 {
+            shuffle(&mut d.cells, seed);
+        }
+        if spread {
+            spread_pins(&mut d, part.device, &opts);
+        }
+        if std::env::var_os("ATF15XX_FLOW_DEBUG").is_some() {
+            eprintln!("strategy {si}: max_products {mp}, ties {ties}, enables {enables}, spread {spread} ({st:?})");
+            for c in &d.cells {
+                eprintln!(
+                    "cell {:24} {:?} out={} products={} (complement {}) inputs={} ce={} ar={} ap={} oe={}",
+                    c.name,
+                    c.storage,
+                    c.is_output,
+                    c.data.0.len(),
+                    c.data.complement().0.len(),
+                    c.inputs().len(),
+                    c.ce.is_some(),
+                    c.ar.is_some(),
+                    c.ap.is_some(),
+                    c.oe.is_some()
+                );
             }
-            if spread {
-                spread_pins(&mut d, part.device, &opts);
-            }
-            if std::env::var_os("ATF15XX_FLOW_DEBUG").is_some() {
-                eprintln!("strategy {si}: max_products {mp}, ties {ties}, enables {enables}, spread {spread} ({st:?})");
-                for c in &d.cells {
-                    eprintln!(
-                        "cell {:24} {:?} out={} products={} (complement {}) inputs={} ce={} ar={} ap={} oe={}",
-                        c.name, c.storage, c.is_output, c.data.0.len(), c.data.complement().0.len(), c.inputs().len(),
-                        c.ce.is_some(), c.ar.is_some(), c.ap.is_some(), c.oe.is_some()
-                    );
-                }
-            }
-            let (n_cells, n_buried) = (d.cells.len(), d.cells.iter().filter(|c| !c.is_output).count());
-            let n_pins_in = d.inputs.len();
-            let mut sopts = opts.clone();
-            sopts.special_foldback = special_foldback;
-            // a strategy may not run past the budget (the first one gets at least the whole budget)
-            sopts.deadline = Some(t0 + std::time::Duration::from_secs(o.fit_time));
+        }
+        let (n_cells, n_buried) = (d.cells.len(), d.cells.iter().filter(|c| !c.is_output).count());
+        let n_pins_in = d.inputs.len();
+        let mut sopts = opts.clone();
+        sopts.special_foldback = special_foldback;
+        // a strategy may not run past the budget (the first one gets at least the whole budget)
+        sopts.deadline = Some(t0 + std::time::Duration::from_secs(o.fit_time));
         let name = d.name.clone();
         let passes_s = t_pass.elapsed().as_secs_f64();
         let t_fit = std::time::Instant::now();
@@ -741,7 +774,11 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
                     // even with more macrocells (e.g. one logic level wider instead of two)
                     let (ok, f, _) = judge(&r, &targets, &o.grade, &clock_targets)?;
                     let key = |ok: bool, f: f64, used: usize| -> (bool, f64, f64) {
-                        if targets.goal == Goal::Speed { (ok, f, -(used as f64)) } else { (ok, -(used as f64), f) }
+                        if targets.goal == Goal::Speed {
+                            (ok, f, -(used as f64))
+                        } else {
+                            (ok, -(used as f64), f)
+                        }
                     };
                     let k = key(ok, f, used);
                     if best_key.map_or(true, |b: (bool, f64, f64)| k > b) {
@@ -812,10 +849,7 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
             Some(Place::Pin { pin, .. }) | Some(Place::Dedicated { pin, .. }) => Some(pin),
             _ => None,
         };
-        pins.insert(
-            p.verilog.clone(),
-            serde_json::json!({ "name": p.name, "dir": p.dir, "pin": pin }),
-        );
+        pins.insert(p.verilog.clone(), serde_json::json!({ "name": p.name, "dir": p.dir, "pin": pin }));
     }
     // pad hazards (spec F2.9): floating dedicated inputs with the keeper off; JTAG disabled
     {
@@ -972,7 +1006,13 @@ pub fn make_svf(chip: &str, jed_bytes: &[u8], rev_c: bool, created: &str) -> Res
     use atf15xx_tool::isp::svf::{Rev, SvfOptions};
     let chain = Chain {
         calibration: 1,
-        devices: vec![Device { name: chip.to_string(), ir_width: 10, idcode: true, instr: Instr::ProgramVerify, jed_path: "design.jed".into() }],
+        devices: vec![Device {
+            name: chip.to_string(),
+            ir_width: 10,
+            idcode: true,
+            instr: Instr::ProgramVerify,
+            jed_path: "design.jed".into(),
+        }],
     };
     let opts = GenOptions {
         svf: SvfOptions { rev: if rev_c { Rev::C } else { Rev::D }, tck: 1, state_reset: true, strict: false },

@@ -13,6 +13,6 @@ pub mod opt;
 pub mod plugin;
 pub use atf15xx_arch::part;
 pub mod tt2out;
-pub mod yosys;
-pub mod ynet;
 pub mod wordmap;
+pub mod ynet;
+pub mod yosys;

@@ -84,7 +84,10 @@ pub enum Goal {
 /// `66.6`, `66.6MHz`, `15ns` → number.
 fn number(w: Option<&&str>, unit: &str, e: &dyn Fn(&str) -> String) -> Result<f64, String> {
     let s = w.ok_or_else(|| e("missing value"))?.to_ascii_lowercase();
-    s.trim_end_matches(unit).parse::<f64>().map_err(|_| e("bad number")).and_then(|v| if v > 0.0 { Ok(v) } else { Err(e("must be positive")) })
+    s.trim_end_matches(unit)
+        .parse::<f64>()
+        .map_err(|_| e("bad number"))
+        .and_then(|v| if v > 0.0 { Ok(v) } else { Err(e("must be positive")) })
 }
 
 fn onoff(w: Option<&&str>, e: &dyn Fn(&str) -> String) -> Result<String, String> {
@@ -155,19 +158,37 @@ impl Constraints {
                     }
                 }
                 "bus_keeper" | "keeper" | "pin_keep" => {
-                    if w.len() > 2 || (w.len() == 2 && !matches!(w[1].to_ascii_lowercase().as_str(), "on" | "off" | "1" | "0" | "yes" | "no" | "true" | "false")) {
-                        return Err(e("the bus keeper is one device-wide fuse: use `bus_keeper on` or `bus_keeper off` (no per-port keeper exists)"));
+                    if w.len() > 2
+                        || (w.len() == 2
+                            && !matches!(w[1].to_ascii_lowercase().as_str(), "on" | "off" | "1" | "0" | "yes" | "no" | "true" | "false"))
+                    {
+                        return Err(e(
+                            "the bus keeper is one device-wide fuse: use `bus_keeper on` or `bus_keeper off` (no per-port keeper exists)",
+                        ));
                     }
                     c.options.push(("pin_keep".into(), vec![onoff(w.get(1), &e)?]));
                 }
                 "pullup" => {
                     let which = w.get(1).map(|s| s.to_ascii_lowercase()).ok_or_else(|| e("pullup tms|tdi on|off"))?;
-                    let k = match which.as_str() { "tms" => "tms_pullup", "tdi" => "tdi_pullup", _ => return Err(e("pullup tms|tdi on|off")) };
+                    let k = match which.as_str() {
+                        "tms" => "tms_pullup",
+                        "tdi" => "tdi_pullup",
+                        _ => return Err(e("pullup tms|tdi on|off")),
+                    };
                     c.options.push((k.into(), vec![onoff(w.get(2), &e)?]));
                 }
                 "input_transition_detect" | "itd" => {
-                    let which = w.get(1).map(|s| s.to_ascii_lowercase()).ok_or_else(|| e("input_transition_detect gclk1|gclk2|gclk3|all on|off"))?;
-                    let n = match which.as_str() { "gclk1" => "1", "gclk2" => "2", "gclk3" => "3", "all" => "all", _ => return Err(e("input_transition_detect gclk1|gclk2|gclk3|all on|off")) };
+                    let which = w
+                        .get(1)
+                        .map(|s| s.to_ascii_lowercase())
+                        .ok_or_else(|| e("input_transition_detect gclk1|gclk2|gclk3|all on|off"))?;
+                    let n = match which.as_str() {
+                        "gclk1" => "1",
+                        "gclk2" => "2",
+                        "gclk3" => "3",
+                        "all" => "all",
+                        _ => return Err(e("input_transition_detect gclk1|gclk2|gclk3|all on|off")),
+                    };
                     c.options.push(("itd_net".into(), vec![n.into(), onoff(w.get(2), &e)?]));
                 }
                 "power_down" => {
@@ -209,9 +230,7 @@ impl Constraints {
     /// Returns the per-port pin assignment (sanitised name -> pin) and warnings.
     pub fn apply(&self, ports: &mut [PortBit], opts: &mut Options) -> Result<Vec<String>, String> {
         let mut warn = vec![];
-        let resolve = |n: &str, ports: &[PortBit]| -> Option<usize> {
-            ports.iter().position(|p| p.verilog == n || p.name == n)
-        };
+        let resolve = |n: &str, ports: &[PortBit]| -> Option<usize> { ports.iter().position(|p| p.verilog == n || p.name == n) };
         for (n, &pin) in &self.pins {
             let i = resolve(n, ports).ok_or_else(|| format!("constraint for unknown port {n}"))?;
             ports[i].loc = Some(pin);
@@ -263,7 +282,10 @@ mod tests {
 
     #[test]
     fn device_directives() {
-        let c = Constraints::parse("bus_keeper off\npullup tms on\ninput_transition_detect gclk2 off\npower_down pd1 on\npower_reset on\njtag on\n").unwrap();
+        let c = Constraints::parse(
+            "bus_keeper off\npullup tms on\ninput_transition_detect gclk2 off\npower_down pd1 on\npower_reset on\njtag on\n",
+        )
+        .unwrap();
         let mut o = Options::default();
         c.apply(&mut [], &mut o).unwrap();
         assert!(!o.pin_keep && o.tms_pullup && !o.itd[1] && o.itd[0] && o.pd1 && o.power_reset && o.jtag);
@@ -272,7 +294,9 @@ mod tests {
 
     #[test]
     fn parse_file() {
-        let c = Constraints::parse("device ATF1504AS-PLCC44\nset_io clk 43\nset_io q[3:0] 4 5 6 8 # lsb first\nfast q[0]\noption jtag on\n").unwrap();
+        let c =
+            Constraints::parse("device ATF1504AS-PLCC44\nset_io clk 43\nset_io q[3:0] 4 5 6 8 # lsb first\nfast q[0]\noption jtag on\n")
+                .unwrap();
         assert_eq!(c.pins["clk"], 43);
         assert_eq!(c.pins["q[0]"], 4);
         assert_eq!(c.pins["q[3]"], 8);

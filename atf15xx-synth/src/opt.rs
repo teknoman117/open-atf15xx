@@ -61,9 +61,24 @@ pub fn split_large(d: &mut Design, max_products: usize) -> usize {
                 let take = node_limit.min(data.0.len() - limit + 1);
                 let at = data.0.len() - take;
                 let chunk: Vec<_> = data.0.split_off(at);
-                let n = (0..).map(|k| format!("{base}_s{k}")).find(|n| d.cell_index(n).is_none() && !nodes.iter().any(|x: &Cell| &x.name == n)).unwrap();
-                let mut node = Cell { name: n.clone(), is_output: false, pin: None, node: Some(0), storage: Storage::Comb,
-                    data: Sop(chunk), active_low: false, clk: None, ce: None, ar: None, ap: None, oe: None };
+                let n = (0..)
+                    .map(|k| format!("{base}_s{k}"))
+                    .find(|n| d.cell_index(n).is_none() && !nodes.iter().any(|x: &Cell| &x.name == n))
+                    .unwrap();
+                let mut node = Cell {
+                    name: n.clone(),
+                    is_output: false,
+                    pin: None,
+                    node: Some(0),
+                    storage: Storage::Comb,
+                    data: Sop(chunk),
+                    active_low: false,
+                    clk: None,
+                    ce: None,
+                    ar: None,
+                    ap: None,
+                    oe: None,
+                };
                 node.data = node.data.minimize();
                 data.0.push(vec![(Signal::Fb(n, false), true)]);
                 nodes.push(node);
@@ -263,7 +278,11 @@ pub fn collapse_limited(d: &mut Design, max_products: usize, ties: bool) {
 /// not fit the PTs its special functions leave free.
 fn mcs_for(c: &Cell, data: &Sop) -> usize {
     let cap = data_limit(c, 5).min(5);
-    if cost(data) <= cap { 1 } else { 2 }
+    if cost(data) <= cap {
+        1
+    } else {
+        2
+    }
 }
 
 /// `f` with buried combinatorial nodes substituted recursively, or None if the cover grows beyond
@@ -358,7 +377,9 @@ impl<'a> BddNet<'a> {
 
     /// A small cover of `b` (greedy-optimised DNF, then made irredundant); None beyond `max`.
     fn cover(&self, b: &biodivine_lib_bdd::Bdd, max: usize) -> Option<Sop> {
-        let dnf = b._to_optimized_dnf(true, &|dnf: &[biodivine_lib_bdd::BddPartialValuation]| if dnf.len() > max { Err(()) } else { Ok(()) }).ok()?;
+        let dnf = b
+            ._to_optimized_dnf(true, &|dnf: &[biodivine_lib_bdd::BddPartialValuation]| if dnf.len() > max { Err(()) } else { Ok(()) })
+            .ok()?;
         let mut s = Sop::zero();
         for clause in dnf {
             s.push(clause.to_values().into_iter().map(|(v, val)| (self.sig_of[v.to_index()].clone(), val)).collect());
@@ -395,7 +416,9 @@ fn flatten(d: &Design, f: &Sop, budget: usize) -> Option<Sop> {
     let mut f = f.clone();
     for _ in 0..64 {
         let node = f.signals().into_iter().find_map(|s| match &s {
-            Signal::Fb(n, false) => d.cell(n).filter(|c| !c.is_output && c.storage == Storage::Comb && c.oe.is_none()).map(|c| (s.clone(), c)),
+            Signal::Fb(n, false) => {
+                d.cell(n).filter(|c| !c.is_output && c.storage == Storage::Comb && c.oe.is_none()).map(|c| (s.clone(), c))
+            }
             _ => None,
         });
         let Some((s, c)) = node else { return Some(f) };
@@ -604,11 +627,15 @@ pub fn recover_enables(d: &mut Design, max_products: usize) -> usize {
         let dbg = std::env::var_os("ATF15XX_FLOW_DEBUG").is_some();
         let q = Signal::Fb(c.name.clone(), true);
         let Some(df) = flatten_through(d, &c.data, &q, 64) else {
-            if dbg { eprintln!("enables: {}: does not flatten", c.name) }
+            if dbg {
+                eprintln!("enables: {}: does not flatten", c.name)
+            }
             continue;
         };
         if !df.signals().contains(&q) {
-            if dbg { eprintln!("enables: {}: no Q in {:?}", c.name, df.signals()) }
+            if dbg {
+                eprintln!("enables: {}: no Q in {:?}", c.name, df.signals())
+            }
             continue;
         }
         let d1 = df.substitute(&q, &Sop::one(), &Sop::zero()).minimize();
@@ -626,7 +653,9 @@ pub fn recover_enables(d: &mut Design, max_products: usize) -> usize {
         probe.ce = Some(Sop(vec![vec![(Signal::Fb("ce".into(), false), true)]]));
         let old = mcs_for(c, &df);
         let new = mcs_for(&probe, &nd);
-        if dbg { eprintln!("enables: {}: D {} -> {} products, CE {} products, MCs {old} -> {new}", c.name, cost(&df), cost(&nd), ce.0.len()) }
+        if dbg {
+            eprintln!("enables: {}: D {} -> {} products, CE {} products, MCs {old} -> {new}", c.name, cost(&df), cost(&nd), ce.0.len())
+        }
         if cost(&nd) > data_limit(&probe, max_products) {
             continue;
         }
@@ -655,8 +684,20 @@ pub fn recover_enables(d: &mut Design, max_products: usize) -> usize {
         } else {
             let base = format!("{}_ce", d.cells[cand[ks[0]].0].name);
             let name = (0..).map(|k| format!("{base}{k}")).find(|x| d.cell_index(x).is_none()).unwrap();
-            new_nodes.push(Cell { name: name.clone(), is_output: false, pin: None, node: Some(0), storage: Storage::Comb,
-                data: ce, active_low: false, clk: None, ce: None, ar: None, ap: None, oe: None });
+            new_nodes.push(Cell {
+                name: name.clone(),
+                is_output: false,
+                pin: None,
+                node: Some(0),
+                storage: Storage::Comb,
+                data: ce,
+                active_low: false,
+                clk: None,
+                ce: None,
+                ar: None,
+                ap: None,
+                oe: None,
+            });
             Sop(vec![vec![(Signal::Fb(name, false), true)]])
         };
         for &k in &ks {
@@ -714,9 +755,7 @@ pub fn recover_latch_resets(d: &mut Design) -> usize {
 pub fn remove_dead(d: &mut Design) -> usize {
     let mut removed = 0;
     loop {
-        let dead = d.cells.iter().position(|c| {
-            !c.is_output && c.storage == Storage::Comb && readers_of(d, &c.name).is_empty()
-        });
+        let dead = d.cells.iter().position(|c| !c.is_output && c.storage == Storage::Comb && readers_of(d, &c.name).is_empty());
         match dead {
             Some(i) => {
                 d.cells.remove(i);
@@ -773,8 +812,20 @@ mod tests {
     }
 
     fn cell(name: &str, data: Sop) -> Cell {
-        Cell { name: name.into(), is_output: false, pin: None, node: None, storage: Storage::Comb, data,
-               active_low: false, clk: None, ce: None, ar: None, ap: None, oe: None }
+        Cell {
+            name: name.into(),
+            is_output: false,
+            pin: None,
+            node: None,
+            storage: Storage::Comb,
+            data,
+            active_low: false,
+            clk: None,
+            ce: None,
+            ar: None,
+            ap: None,
+            oe: None,
+        }
     }
 
     #[test]
@@ -793,4 +844,3 @@ mod tests {
         assert!(d.cell("y").unwrap().inputs().len() <= MAX_SUPPORT);
     }
 }
-

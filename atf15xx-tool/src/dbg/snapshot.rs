@@ -42,7 +42,10 @@ pub fn dedicated(part: &Part, bits: &[bool]) -> Vec<(String, Option<u16>, bool)>
 /// Human-readable snapshot: dedicated inputs, design signals, optionally every macrocell.
 pub fn render(part: &Part, bits: &[bool], signals: &[Signal], all_macrocells: bool) -> String {
     let mut o = String::new();
-    let ded: Vec<String> = dedicated(part, bits).iter().map(|(n, p, v)| format!("{n}(pin {})={}", p.map_or("-".into(), |p| p.to_string()), u8::from(*v))).collect();
+    let ded: Vec<String> = dedicated(part, bits)
+        .iter()
+        .map(|(n, p, v)| format!("{n}(pin {})={}", p.map_or("-".into(), |p| p.to_string()), u8::from(*v)))
+        .collect();
     writeln!(o, "dedicated: {}", ded.join(" ")).unwrap();
     if !signals.is_empty() {
         let w = signals.iter().map(|s| s.name.len()).max().unwrap_or(0);
@@ -53,7 +56,16 @@ pub fn render(part: &Part, bits: &[bool], signals: &[Signal], all_macrocells: bo
     if all_macrocells || signals.is_empty() {
         writeln!(o, "  MC    pin  pad oe out").unwrap();
         for m in macrocells(part, bits) {
-            writeln!(o, "  {:<5} {:>3}   {}  {}  {}", format!("MC{}", m.mc), m.pin.map_or("-".into(), |p| p.to_string()), u8::from(m.pad), u8::from(m.oe), u8::from(m.out)).unwrap();
+            writeln!(
+                o,
+                "  {:<5} {:>3}   {}  {}  {}",
+                format!("MC{}", m.mc),
+                m.pin.map_or("-".into(), |p| p.to_string()),
+                u8::from(m.pad),
+                u8::from(m.oe),
+                u8::from(m.out)
+            )
+            .unwrap();
         }
     }
     o
@@ -69,11 +81,7 @@ pub fn trace_columns(part: &Part, signals: &[Signal]) -> Vec<(String, usize, boo
 
 /// Columns whose value differs between two captures: `(name, old, new)`.
 pub fn changes(columns: &[(String, usize, bool)], prev: &[bool], cur: &[bool]) -> Vec<(String, bool, bool)> {
-    columns
-        .iter()
-        .filter(|(_, b, _)| prev[*b] != cur[*b])
-        .map(|(n, b, inv)| (n.clone(), prev[*b] != *inv, cur[*b] != *inv))
-        .collect()
+    columns.iter().filter(|(_, b, _)| prev[*b] != cur[*b]).map(|(n, b, inv)| (n.clone(), prev[*b] != *inv, cur[*b] != *inv)).collect()
 }
 
 /// A VCD file of repeated captures (timestamps in microseconds since the first capture).

@@ -23,10 +23,10 @@
 //! * every other `$sop` output becomes a buried combinatorial node, later inlined by
 //!   [`crate::opt::collapse_limited`] where that keeps the product-term count reasonable.
 
-use atf15xx_fit::logic::{Signal, Sop};
-use atf15xx_fit::netlist::{Cell, Design, Storage};
 pub use crate::ynet::Bit;
 use crate::ynet::{self, Const, Netlist};
+use atf15xx_fit::logic::{Signal, Sop};
+use atf15xx_fit::netlist::{Cell, Design, Storage};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Parameter as an unsigned integer (a missing one is an error).
@@ -113,7 +113,15 @@ fn init_bits(v: &Const, n: usize) -> Vec<Option<bool>> {
         Const::Str(s) => s.as_str(),
         _ => "",
     };
-    let mut out: Vec<Option<bool>> = s.chars().rev().map(|c| match c { '0' => Some(false), '1' => Some(true), _ => None }).collect();
+    let mut out: Vec<Option<bool>> = s
+        .chars()
+        .rev()
+        .map(|c| match c {
+            '0' => Some(false),
+            '1' => Some(true),
+            _ => None,
+        })
+        .collect();
     out.resize(n, None);
     out
 }
@@ -281,7 +289,11 @@ impl<'a> Ctx<'a> {
             "$_MUX_" | "$_NMUX_" => {
                 let (a, b, sel) = (inp("A")?, inp("B")?, inp("S")?);
                 let m = sel.complement().and(&a).or(&sel.and(&b));
-                if t == "$_NMUX_" { m.complement() } else { m }
+                if t == "$_NMUX_" {
+                    m.complement()
+                } else {
+                    m
+                }
             }
             "$_AOI3_" => inp("A")?.and(&inp("B")?).or(&inp("C")?).complement(),
             "$_OAI3_" => inp("A")?.or(&inp("B")?).and(&inp("C")?).complement(),
@@ -351,8 +363,20 @@ impl<'a> Ctx<'a> {
 fn is_gate(t: &str) -> bool {
     matches!(
         t,
-        "$_AND_" | "$_OR_" | "$_XOR_" | "$_XNOR_" | "$_NAND_" | "$_NOR_" | "$_ANDNOT_" | "$_ORNOT_" | "$_MUX_"
-            | "$_NMUX_" | "$_AOI3_" | "$_OAI3_" | "$_AOI4_" | "$_OAI4_"
+        "$_AND_"
+            | "$_OR_"
+            | "$_XOR_"
+            | "$_XNOR_"
+            | "$_NAND_"
+            | "$_NOR_"
+            | "$_ANDNOT_"
+            | "$_ORNOT_"
+            | "$_MUX_"
+            | "$_NMUX_"
+            | "$_AOI3_"
+            | "$_OAI3_"
+            | "$_AOI4_"
+            | "$_OAI4_"
     )
 }
 
@@ -454,9 +478,7 @@ pub fn import_netlist(n: &Netlist, top: Option<&str>) -> Result<Imported, String
         if t == "$_TBUF_" {
             ctx.tbuf.insert(conn(c, "Y")?, (conn(c, "A")?, conn(c, "E")?));
         } else if !(t == "$sop" || is_gate(t) || t == "$_NOT_" || t == "$_BUF_" || storage_kind(t).is_some()) {
-            return Err(format!(
-                "unsupported Yosys cell {t} ({cn}); run the ATF15xx synthesis script (atf15xx-synth synth) first"
-            ));
+            return Err(format!("unsupported Yosys cell {t} ({cn}); run the ATF15xx synthesis script (atf15xx-synth synth) first"));
         }
     }
 
@@ -524,10 +546,10 @@ pub fn import_netlist(n: &Netlist, top: Option<&str>) -> Result<Imported, String
     for c in cells.values() {
         let Some((st, ce, r, s)) = storage_kind(&c.ty) else { continue };
         let q = conn(c, "Q")?;
-        let home = out_ports.iter().copied().find(|p| {
-            !homed.contains(&p.name)
-                && (p.bit == q || ctx.tbuf.get(&p.bit).map_or(false, |(a, _)| *a == q))
-        });
+        let home = out_ports
+            .iter()
+            .copied()
+            .find(|p| !homed.contains(&p.name) && (p.bit == q || ctx.tbuf.get(&p.bit).map_or(false, |(a, _)| *a == q)));
         let name = match home {
             Some(p) => {
                 homed.insert(p.name.clone());

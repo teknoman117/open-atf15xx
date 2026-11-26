@@ -475,7 +475,11 @@ fn run(cli: Cli) -> Result<()> {
                             None => "-".into(),
                         })
                         .collect();
-                    let q: String = if print_q { format!(",{}", s.q.iter().map(|&b| if b { '1' } else { '0' }).collect::<String>()) } else { String::new() };
+                    let q: String = if print_q {
+                        format!(",{}", s.q.iter().map(|&b| if b { '1' } else { '0' }).collect::<String>())
+                    } else {
+                        String::new()
+                    };
                     println!("{i},{},{}{q}", row.join(","), s.last_unstable as u8);
                 }
             }

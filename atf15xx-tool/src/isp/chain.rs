@@ -19,20 +19,14 @@ pub struct Chain {
 }
 
 pub const E1: &str = "This is not a valid Chain File.";
-pub const E2: &str =
-    "Invalid Chain file.\nThe number of devices in Chain file must be between 1 and 50.";
+pub const E2: &str = "Invalid Chain file.\nThe number of devices in Chain file must be between 1 and 50.";
 pub fn e3(d: usize) -> String {
-    format!(
-        "Invalid Chain file.\nJEDEC file specified in Chain file for device # {d} does not exist."
-    )
+    format!("Invalid Chain file.\nJEDEC file specified in Chain file for device # {d} does not exist.")
 }
-pub const W1: &str =
-    "Port type specified in Chain file is not supported.\nSetting port type to USB.";
-pub const W2: &str =
-    "Calibration constant in Chain file is invalid.\nSetting Calibration constant to 1.";
+pub const W1: &str = "Port type specified in Chain file is not supported.\nSetting port type to USB.";
+pub const W2: &str = "Calibration constant in Chain file is invalid.\nSetting Calibration constant to 1.";
 pub const W3: &str = "Cable type not specified in Chain file.\nSetting Cable type to ATDH1150USB.";
-pub const W4: &str =
-    "Cable type specified in Chain file is not supported.\nSetting Cable type to ATDH1150USB.";
+pub const W4: &str = "Cable type specified in Chain file is not supported.\nSetting Cable type to ATDH1150USB.";
 pub fn w5(d: usize) -> String {
     format!("Invalid JTAG instruction width in Chain file.\nSetting JTAG instruction width to 10 for device # {d}")
 }
@@ -89,11 +83,7 @@ impl<'a> Reader<'a> {
 }
 
 /// Parse a chain file (§2.2). `jed_exists(d, path)` decides E3 for instructions 1/4/7.
-pub fn parse(
-    data: &[u8],
-    diag: &mut Diagnostics,
-    mut jed_exists: impl FnMut(usize, &str) -> bool,
-) -> Result<Chain, Error> {
+pub fn parse(data: &[u8], diag: &mut Diagnostics, mut jed_exists: impl FnMut(usize, &str) -> bool) -> Result<Chain, Error> {
     // CR LF → LF (text mode)
     let mut norm = Vec::with_capacity(data.len());
     let mut i = 0;
@@ -185,19 +175,11 @@ pub fn parse(
     let mut devices = Vec::new();
     let mut look = String::new();
     for d in 1..=n as usize {
-        let name = if is_name(&look) {
-            look.clone()
-        } else {
-            r.readline()
-        };
+        let name = if is_name(&look) { look.clone() } else { r.readline() };
         let wl = r.readline();
         let il = r.readline();
         look = r.readline();
-        let jed_path = if is_name(&look) {
-            String::new()
-        } else {
-            look.clone()
-        };
+        let jed_path = if is_name(&look) { String::new() } else { look.clone() };
         let idcode = !wl.contains('*');
         let mut w = c_atoi(&wl.replace('*', ""));
         if SUPPORTED.contains(&name.as_str()) && w != 10 {
@@ -212,28 +194,15 @@ pub fn parse(
         if (il == "1" || il == "4" || il == "7") && !jed_exists(d, &jed_path) {
             return Err(Error::Input(e3(d)));
         }
-        devices.push(Device {
-            name,
-            ir_width: w as u32,
-            idcode,
-            instr,
-            jed_path,
-        });
+        devices.push(Device { name, ir_width: w as u32, idcode, instr, jed_path });
     }
-    Ok(Chain {
-        calibration: k as u32,
-        devices,
-    })
+    Ok(Chain { calibration: k as u32, devices })
 }
 
 /// Chain writer (§2.3): CR LF line endings.
 pub fn write(chain: &Chain) -> Vec<u8> {
     let mut s = String::new();
-    s.push_str(&format!(
-        "{} 4 {} 0 \r\n\r\n",
-        chain.devices.len(),
-        chain.calibration
-    ));
+    s.push_str(&format!("{} 4 {} 0 \r\n\r\n", chain.devices.len(), chain.calibration));
     for d in &chain.devices {
         s.push_str(&d.name);
         s.push_str("\r\n");
@@ -255,8 +224,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let t =
-            b"2 4 1 0 \r\n\r\nUNKNOWN\r\n8 *\r\n0\r\n\r\nATF1504AS\r\n10\r\n1\r\nC:\\x\\a.jed\r\n";
+        let t = b"2 4 1 0 \r\n\r\nUNKNOWN\r\n8 *\r\n0\r\n\r\nATF1504AS\r\n10\r\n1\r\nC:\\x\\a.jed\r\n";
         let mut d = Diagnostics::default();
         let c = parse(t, &mut d, |_, _| true).unwrap();
         assert!(d.warnings.is_empty());
@@ -284,9 +252,6 @@ mod tests {
         let c = parse(b"1 1 5000\n\nATF1502AS\n8\n2\n\n", &mut d, |_, _| true).unwrap();
         assert_eq!(c.calibration, 1);
         assert_eq!(c.devices[0].ir_width, 10);
-        assert_eq!(
-            d.warnings,
-            vec![W1.to_string(), W2.to_string(), W3.to_string(), w5(1)]
-        );
+        assert_eq!(d.warnings, vec![W1.to_string(), W2.to_string(), W3.to_string(), w5(1)]);
     }
 }

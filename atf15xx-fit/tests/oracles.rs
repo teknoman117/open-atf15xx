@@ -40,9 +40,18 @@ fn logic_against_espresso() {
         for _ in 0..250 {
             let k = rng.random_range(1..=2 * n);
             let cubes: Vec<Vec<Option<bool>>> = (0..k)
-                .map(|_| (0..n).map(|_| match rng.random_range(0..3) { 0 => Some(false), 1 => Some(true), _ => None }).collect())
+                .map(|_| {
+                    (0..n)
+                        .map(|_| match rng.random_range(0..3) {
+                            0 => Some(false),
+                            1 => Some(true),
+                            _ => None,
+                        })
+                        .collect()
+                })
                 .collect();
-            let f = Sop(cubes.iter().map(|c| c.iter().enumerate().filter_map(|(i, x)| x.map(|b| (vars[i].clone(), b))).collect()).collect());
+            let f =
+                Sop(cubes.iter().map(|c| c.iter().enumerate().filter_map(|(i, x)| x.map(|b| (vars[i].clone(), b))).collect()).collect());
             let ours = f.minimize();
             let comp = f.complement();
             for m in 0..(1u32 << n) {
@@ -70,7 +79,8 @@ fn uim_matcher_against_petgraph() {
     use petgraph::graph::UnGraph;
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(11);
     for f in Family::ALL {
-        let mut sources: Vec<Source> = (0..40).flat_map(|m| f.uim_choices(m).iter().copied()).filter(|s| !matches!(s, Source::Gnd | Source::None)).collect();
+        let mut sources: Vec<Source> =
+            (0..40).flat_map(|m| f.uim_choices(m).iter().copied()).filter(|s| !matches!(s, Source::Gnd | Source::None)).collect();
         sources.sort();
         sources.dedup();
         let (mut routed, mut tried) = (0, 0);

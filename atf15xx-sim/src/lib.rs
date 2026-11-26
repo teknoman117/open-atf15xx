@@ -75,13 +75,7 @@ pub fn load(jed: &std::path::Path, device_name: &str, opts: model::Options) -> R
     let dev = device(device_name)?;
     let fz = read_jed(jed)?;
     if fz.family != dev.family {
-        return Err(anyhow!(
-            "{} is a {} fuse map but device {} is a {}",
-            jed.display(),
-            fz.family,
-            dev.name,
-            dev.family
-        ));
+        return Err(anyhow!("{} is a {} fuse map but device {} is a {}", jed.display(), fz.family, dev.name, dev.family));
     }
     Ok(model::Model::new(dev, &fz.bits, opts))
 }

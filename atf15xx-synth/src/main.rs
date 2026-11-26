@@ -168,14 +168,20 @@ fn run(cli: Cli) -> Result<(), String> {
     let fits: Vec<(MapMode, Result<flow::Outputs, String>)> = jsons
         .par_iter()
         .map(|(mode, json)| {
-            let r = std::fs::read_to_string(json).map_err(|e| format!("{}: {e}", json.display())).and_then(|text| flow::fit_json(&text, &o, &cmdline));
+            let r = std::fs::read_to_string(json)
+                .map_err(|e| format!("{}: {e}", json.display()))
+                .and_then(|text| flow::fit_json(&text, &o, &cmdline));
             (*mode, r)
         })
         .collect();
     for (mode, fit) in fits {
         match fit {
             Ok(r) => {
-                notes.push(format!("{mode:?}: {} macrocells{}", flow::macrocells_used(&r.result), r.fmax_mhz.map_or(String::new(), |f| format!(", fmax {f:.1} MHz"))));
+                notes.push(format!(
+                    "{mode:?}: {} macrocells{}",
+                    flow::macrocells_used(&r.result),
+                    r.fmax_mhz.map_or(String::new(), |f| format!(", fmax {f:.1} MHz"))
+                ));
                 if best.as_ref().map_or(true, |(_, b)| flow::better(b, &r)) {
                     best = Some((mode, r));
                 }

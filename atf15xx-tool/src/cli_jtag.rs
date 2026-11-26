@@ -185,7 +185,10 @@ pub fn run(cli: &JtagArgs, cmd: Cmd) -> Result<()> {
         if let Some(max) = part.max_tck_khz {
             println!("  maximum TCK {max} kHz; JTAG pins {:?}", part.jtag_pins);
         }
-        println!("  instructions {}", part.opcodes.iter().map(|(k, v)| format!("{k}={v:0w$b}", w = part.ir_len)).collect::<Vec<_>>().join(" "));
+        println!(
+            "  instructions {}",
+            part.opcodes.iter().map(|(k, v)| format!("{k}={v:0w$b}", w = part.ir_len)).collect::<Vec<_>>().join(" ")
+        );
         let no_pad = (1..=part.macrocells()).filter(|&m| part.mc_cell(m, part::CellKind::In).is_none()).count();
         println!(
             "  cells agree with the device table: {} on pins, {} dedicated inputs; {no_pad} macrocells without a pad input cell",
@@ -292,8 +295,10 @@ pub fn run(cli: &JtagArgs, cmd: Cmd) -> Result<()> {
         }
         Cmd::Drive { design, yes_drive_pins, allow_inputs, hold, assign } => {
             if !yes_drive_pins {
-                bail!("EXTEST drives the device's pins and disconnects its logic from all of them; \
-                       make sure nothing else drives the pins you set, then pass --yes-drive-pins");
+                bail!(
+                    "EXTEST drives the device's pins and disconnects its logic from all of them; \
+                       make sure nothing else drives the pins you set, then pass --yes-drive-pins"
+                );
             }
             check_length(&mut scan)?;
             let signals = load(&design)?;
@@ -303,8 +308,10 @@ pub fn run(cli: &JtagArgs, cmd: Cmd) -> Result<()> {
                 for (mc, _) in &drives {
                     let oe = part.mc_cell(*mc, part::CellKind::Oe).map(|c| base[c.bit]).unwrap_or(false);
                     if !oe {
-                        bail!("MC{mc}'s pin is an input of the current design (output enable 0): something else may \
-                               be driving it; pass --allow-inputs if you know it is free");
+                        bail!(
+                            "MC{mc}'s pin is an input of the current design (output enable 0): something else may \
+                               be driving it; pass --allow-inputs if you know it is free"
+                        );
                     }
                 }
             }
@@ -318,14 +325,21 @@ pub fn run(cli: &JtagArgs, cmd: Cmd) -> Result<()> {
             for (mc, v) in &drives {
                 let pin = part.mc_cell(*mc, part::CellKind::Out).and_then(|c| c.pin);
                 let pad = part.mc_cell(*mc, part::CellKind::In).map(|c| after[c.bit]);
-                println!("MC{mc} (pin {}): drove {}, pad reads {}", pin.unwrap_or(0), u8::from(*v), pad.map_or("-".into(), |p| u8::from(p).to_string()));
+                println!(
+                    "MC{mc} (pin {}): drove {}, pad reads {}",
+                    pin.unwrap_or(0),
+                    u8::from(*v),
+                    pad.map_or("-".into(), |p| u8::from(p).to_string())
+                );
             }
             let _ = cap;
         }
         Cmd::Seq { design, yes_drive_pins, allow_inputs, hold_outputs, script } => {
             if !yes_drive_pins {
-                bail!("a session drives the device's pins and disconnects its logic from all of them; \
-                       make sure nothing else drives the pins you set, then pass --yes-drive-pins");
+                bail!(
+                    "a session drives the device's pins and disconnects its logic from all of them; \
+                       make sure nothing else drives the pins you set, then pass --yes-drive-pins"
+                );
             }
             check_length(&mut scan)?;
             drop(scan);
@@ -385,7 +399,13 @@ fn program(cfg: &OpenOcdConfig, part: &Part, jed: &std::path::Path, keep: Option
         );
     }
     let t0 = Instant::now();
-    play_svf(cfg, part, &svf, keep, &format!("programming {} ({} JTAG port)", jed.display(), if jtag_on { "keeps the" } else { "DISABLES the" }))?;
+    play_svf(
+        cfg,
+        part,
+        &svf,
+        keep,
+        &format!("programming {} ({} JTAG port)", jed.display(), if jtag_on { "keeps the" } else { "DISABLES the" }),
+    )?;
     println!("programmed and verified {} in {:.1} s", jed.display(), t0.elapsed().as_secs_f64());
     Ok(())
 }

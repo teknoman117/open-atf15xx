@@ -20,12 +20,7 @@ pub struct SvfOptions {
 
 impl Default for SvfOptions {
     fn default() -> Self {
-        SvfOptions {
-            rev: Rev::D,
-            tck: 1,
-            state_reset: true,
-            strict: false,
-        }
+        SvfOptions { rev: Rev::D, tck: 1, state_reset: true, strict: false }
     }
 }
 
@@ -37,10 +32,7 @@ pub struct Svf {
 
 impl Svf {
     pub fn new(opt: SvfOptions) -> Svf {
-        Svf {
-            opt,
-            out: String::with_capacity(1 << 20),
-        }
+        Svf { opt, out: String::with_capacity(1 << 20) }
     }
 
     pub fn into_bytes(self) -> Vec<u8> {
@@ -56,19 +48,8 @@ impl Svf {
     pub fn header(&mut self, ctime: &str) {
         self.line("//  SVF file written by ATMISP version 7.3");
         self.line(&format!("//  Created on: {ctime}"));
-        self.line(&format!(
-            "//  SVF Rev. {}  ",
-            if self.opt.rev == Rev::C { 'C' } else { 'D' }
-        ));
-        for l in [
-            "TRST ABSENT;",
-            "ENDIR IDLE;",
-            "ENDDR IDLE;",
-            "HDR 0;",
-            "HIR 0;",
-            "TDR 0;",
-            "TIR 0;",
-        ] {
+        self.line(&format!("//  SVF Rev. {}  ", if self.opt.rev == Rev::C { 'C' } else { 'D' }));
+        for l in ["TRST ABSENT;", "ENDIR IDLE;", "ENDDR IDLE;", "HDR 0;", "HIR 0;", "TDR 0;", "TIR 0;"] {
             self.line(l);
         }
     }

@@ -352,10 +352,7 @@ fn tautology(c: &[Cube], _n: usize) -> bool {
 
 fn cofactor(c: &[Cube], i: usize, v: bool) -> Vec<Cube> {
     let b = 1u64 << i;
-    c.iter()
-        .filter(|x| x.care & b == 0 || ((x.val & b != 0) == v))
-        .map(|x| Cube { care: x.care & !b, val: x.val & !b })
-        .collect()
+    c.iter().filter(|x| x.care & b == 0 || ((x.val & b != 0) == v)).map(|x| Cube { care: x.care & !b, val: x.val & !b }).collect()
 }
 
 /// The complement as a cube list (merged and made irredundant by the caller). The plain Shannon
@@ -451,10 +448,7 @@ fn complement_plain(c: &[Cube], n: usize, budget: &mut usize) -> Option<Vec<Cube
     }
     if c.len() == 1 {
         let x = c[0];
-        return take(
-            budget,
-            (0..n).filter(|i| x.care >> i & 1 == 1).map(|i| Cube { care: 1 << i, val: !x.val & (1 << i) }).collect(),
-        );
+        return take(budget, (0..n).filter(|i| x.care >> i & 1 == 1).map(|i| Cube { care: 1 << i, val: !x.val & (1 << i) }).collect());
     }
     let mut best = (0, 0usize);
     for i in 0..n {
@@ -853,4 +847,3 @@ pub fn memo_stats() -> ((u64, u64), (u64, u64)) {
     let s = |m: &'static std::thread::LocalKey<Memo>| m.with(|c| (c.borrow().1, c.borrow().2));
     (s(&MINIMIZE), s(&COMPLEMENT))
 }
-

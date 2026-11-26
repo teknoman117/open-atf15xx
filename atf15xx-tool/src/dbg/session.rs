@@ -58,7 +58,17 @@ impl<'a, J: Jtag> Session<'a, J> {
     pub fn new(jtag: &'a mut J, part: &'a Part, signals: &'a [Signal], options: Options) -> Result<Self> {
         let mut scan = Scanner::new(jtag, part);
         let initial = scan.sample()?;
-        Ok(Session { scan, part, signals, options, last: initial.clone(), initial, drives: BTreeMap::new(), floating: BTreeMap::new(), failures: 0 })
+        Ok(Session {
+            scan,
+            part,
+            signals,
+            options,
+            last: initial.clone(),
+            initial,
+            drives: BTreeMap::new(),
+            floating: BTreeMap::new(),
+            failures: 0,
+        })
     }
 
     /// The latest capture.
@@ -179,8 +189,10 @@ impl<'a, J: Jtag> Session<'a, J> {
         }
         let oe = self.part.mc_cell(mc, CellKind::Oe).map(|c| self.initial[c.bit]).unwrap_or(false);
         if !oe {
-            bail!("MC{mc}'s pin is an input of the design (output enable 0): something else may be driving it; \
-                   use --allow-inputs once it is free (e.g. the CPU holds the bus released)");
+            bail!(
+                "MC{mc}'s pin is an input of the design (output enable 0): something else may be driving it; \
+                   use --allow-inputs once it is free (e.g. the CPU holds the bus released)"
+            );
         }
         Ok(())
     }

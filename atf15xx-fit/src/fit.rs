@@ -260,7 +260,11 @@ fn doubling_register_ok(c: &Cell) -> bool {
 
 /// A PT slot (2..=5) to which a cell's PT1 product can move, freeing PT1 for a foldback expander.
 fn fold_movable(pl: &PtPlan) -> Option<usize> {
-    if pl.fold_host || pl.hosted.is_some() || !pl.helper_pts.is_empty() || pl.pts.get(&1).map_or(false, |p| p.iter().any(|(s, _)| matches!(s, Signal::Fold(_)))) {
+    if pl.fold_host
+        || pl.hosted.is_some()
+        || !pl.helper_pts.is_empty()
+        || pl.pts.get(&1).map_or(false, |p| p.iter().any(|(s, _)| matches!(s, Signal::Fold(_))))
+    {
         return None;
     }
     if pl.pts.contains_key(&1) && !pl.in_sum.contains(&1) {
@@ -338,11 +342,14 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
         let hosts = design.cells.iter().filter(|c| c.is_output && c.storage == Storage::Comb).count();
         let need = design.cells.len().saturating_sub(regs.min(hosts));
         if need > nmc {
-            return err(FitErrorKind::Capacity, format!(
-                "no free macrocell: {} cells need at least {need} macrocells (at most {} pairs can share one), the device has {nmc}",
-                design.cells.len(),
-                regs.min(hosts)
-            ));
+            return err(
+                FitErrorKind::Capacity,
+                format!(
+                    "no free macrocell: {} cells need at least {need} macrocells (at most {} pairs can share one), the device has {nmc}",
+                    design.cells.len(),
+                    regs.min(hosts)
+                ),
+            );
         }
     }
     let mut last = None;
@@ -373,7 +380,11 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
                 }
             }
             if std::env::var_os("ATF_FIT_DEBUG").is_some() {
-                eprintln!("fit attempt (limit {limit}, extra {extra}): {:.2} s: {}", ta.elapsed().as_secs_f64(), attempt.as_ref().err().map_or("ok".into(), |e| e.msg.chars().take(80).collect::<String>()));
+                eprintln!(
+                    "fit attempt (limit {limit}, extra {extra}): {:.2} s: {}",
+                    ta.elapsed().as_secs_f64(),
+                    attempt.as_ref().err().map_or("ok".into(), |e| e.msg.chars().take(80).collect::<String>())
+                );
             }
             match attempt {
                 Ok(r) => return Ok(r),
@@ -386,9 +397,8 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
                     // when that block fills up)
                     let nblk = (dev.family.macrocells() / 16) as usize;
                     let avoided = |n: &str| avoid.iter().filter(|(m, _)| m == n).count();
-                    if let Some(n) = list
-                        .split(',')
-                        .find(|n| !n.is_empty() && !avoid.contains(&(n.to_string(), b)) && avoided(n) + 3 <= nblk)
+                    if let Some(n) =
+                        list.split(',').find(|n| !n.is_empty() && !avoid.contains(&(n.to_string(), b)) && avoided(n) + 3 <= nblk)
                     {
                         avoid.insert((n.to_string(), b));
                         repairs += 1;
@@ -545,11 +555,7 @@ fn place_cells(
     let mut uses = vec![McUse::default(); nmc + 1];
     let placement: Vec<(String, Place)> = vec![];
     let mut place_of: BTreeMap<String, Place> = BTreeMap::new();
-    let jtag_pins: Vec<u16> = if opts.jtag {
-        vec![dev.jtag.tdi, dev.jtag.tms, dev.jtag.tck, dev.jtag.tdo]
-    } else {
-        vec![]
-    };
+    let jtag_pins: Vec<u16> = if opts.jtag { vec![dev.jtag.tdi, dev.jtag.tms, dev.jtag.tck, dev.jtag.tdo] } else { vec![] };
     let mut reserved_pins: BTreeSet<u16> = jtag_pins.iter().copied().collect();
     if opts.pd1 {
         reserved_pins.insert(dev.pd1);
@@ -586,12 +592,8 @@ fn place_cells(
     }
 
     // ---- place inputs
-    let mut free_dedicated: Vec<(u16, Dedicated)> = vec![
-        (dev.gclk1, Dedicated::Gclk1),
-        (dev.oe1, Dedicated::Oe1),
-        (dev.gclr, Dedicated::Gclr),
-        (dev.gclk2_oe2, Dedicated::Gclk2Oe2),
-    ];
+    let mut free_dedicated: Vec<(u16, Dedicated)> =
+        vec![(dev.gclk1, Dedicated::Gclk1), (dev.oe1, Dedicated::Oe1), (dev.gclr, Dedicated::Gclr), (dev.gclk2_oe2, Dedicated::Gclk2Oe2)];
     let mut taken_pins: BTreeSet<u16> = BTreeSet::new();
     // pinned inputs first
     for name in &design.input_order {
@@ -696,8 +698,7 @@ fn place_cells(
         }
     }
     let mc_taken = |uses: &Vec<McUse>, place_of: &BTreeMap<String, Place>, mc: u16| -> bool {
-        uses[mc as usize].pad_used
-            || place_of.values().any(|p| matches!(p, Place::Pin { mc: m, .. } | Place::Node { mc: m } if *m == mc))
+        uses[mc as usize].pad_used || place_of.values().any(|p| matches!(p, Place::Pin { mc: m, .. } | Place::Node { mc: m } if *m == mc))
     };
     // floating outputs: lowest block first, highest macrocell of the block first (vendor order)
     for c in &design.cells {
@@ -804,7 +805,11 @@ fn place_cells(
             }
             eprintln!(
                 "fit: {} cells, {} cascade helpers, {} MCs, need {} doubled, got {} (fan-in limit {fanin_limit}, extra {extra_pairs})",
-                design.cells.len(), helpers, nmc, need, host_of.len()
+                design.cells.len(),
+                helpers,
+                nmc,
+                need,
+                host_of.len()
             );
         }
         for (&ri, &yi) in host_of.iter() {
@@ -897,19 +902,16 @@ fn place_cells(
             continue;
         }
         let cell_mcs = cell_mcs_now(&place_of);
-        let slot = dev
-            .io_pins()
-            .map(|(p, m)| (m, p))
-            .collect::<BTreeMap<_, _>>()
-            .into_iter()
-            .find(|&(m, p)| {
-                !reserved_pins.contains(&p) && !taken_pins.contains(&p) && !uses[m as usize].pad_used && !cell_mcs.contains(&m)
-            });
+        let slot = dev.io_pins().map(|(p, m)| (m, p)).collect::<BTreeMap<_, _>>().into_iter().find(|&(m, p)| {
+            !reserved_pins.contains(&p) && !taken_pins.contains(&p) && !uses[m as usize].pad_used && !cell_mcs.contains(&m)
+        });
         let Some((mc, pin)) = slot else {
             // all I/O pins taken: an unused dedicated input pin also reaches every UIM
-            let ded = [dev.gclk1, dev.oe1, dev.gclr, dev.gclk2_oe2]
-                .into_iter()
-                .find(|p| !taken_pins.contains(p) && !reserved_pins.contains(p) && !place_of.values().any(|x| matches!(x, Place::Dedicated { pin, .. } if pin == p)));
+            let ded = [dev.gclk1, dev.oe1, dev.gclr, dev.gclk2_oe2].into_iter().find(|p| {
+                !taken_pins.contains(p)
+                    && !reserved_pins.contains(p)
+                    && !place_of.values().any(|x| matches!(x, Place::Dedicated { pin, .. } if pin == p))
+            });
             match ded.and_then(|p| dev.dedicated(p).map(|f| (p, f))) {
                 Some((p, func)) => {
                     taken_pins.insert(p);
@@ -1046,7 +1048,11 @@ fn global_nets(dev: &'static Device, design: &Design, opts: &Options, placed: &P
                 if let Some(net) = pin_of_name(n).and_then(net_of_pin) {
                     let w = if c.ce.is_some() { 1000 } else { 1 };
                     let v = votes.entry(net).or_default();
-                    if pos { v.0 += w } else { v.1 += w }
+                    if pos {
+                        v.0 += w
+                    } else {
+                        v.1 += w
+                    }
                 }
             }
         }
@@ -1240,7 +1246,8 @@ fn plan_pts(dev: &'static Device, design: &Design, opts: &Options, placed: &mut 
             // factor better (`L&a&(b+c+!d) + ...` has a larger cover but a common cube)
             let mine = factor(pl.sum.clone());
             let other_cover = if pl.invert { as_is.clone() } else { flipped.clone() };
-            if !pl.xor && mine.len() > free.len() && !other_cover.is_empty() && other_cover.len() < 99 && !Sop(other_cover.clone()).is_one() {
+            if !pl.xor && mine.len() > free.len() && !other_cover.is_empty() && other_cover.len() < 99 && !Sop(other_cover.clone()).is_one()
+            {
                 let other = factor(other_cover);
                 if other.len() < mine.len() {
                     pl.sum = other;
@@ -1314,10 +1321,7 @@ fn plan_pts(dev: &'static Device, design: &Design, opts: &Options, placed: &mut 
         let mc = mc_of(place_of, &c.name);
         // a PT-free input register (D from the pad) leaves its macrocell's PTs and sum free
         let shareable = |j: usize| plans[j].fast_in && plans[j].pts.is_empty() && !plans[j].fold_host;
-        if (mc - 1) % 16 == 0
-            || uses[mc as usize - 1].cell.map_or(false, |j| !shareable(j))
-            || uses[mc as usize - 1].helper_for.is_some()
-        {
+        if (mc - 1) % 16 == 0 || uses[mc as usize - 1].cell.map_or(false, |j| !shareable(j)) || uses[mc as usize - 1].helper_for.is_some() {
             return err(FitErrorKind::Cascade, format!("{}: needs cascade from MC{} which is not free", c.name, mc - 1));
         }
         uses[mc as usize - 1].helper_for = Some(mc);
@@ -1409,20 +1413,29 @@ fn host_foldbacks(design: &Design, opts: &Options, placed: &mut Placed, plans: &
                                 None => "free".into(),
                                 Some(j) => {
                                     let pl = &plans[j];
-                                    format!("{} pts {:?} sum {:?} fold_host {} hosted {} helpers {}", design.cells[j].name, pl.pts.keys().collect::<Vec<_>>(), pl.in_sum, pl.fold_host, pl.hosted.is_some(), pl.helper_pts.len())
+                                    format!(
+                                        "{} pts {:?} sum {:?} fold_host {} hosted {} helpers {}",
+                                        design.cells[j].name,
+                                        pl.pts.keys().collect::<Vec<_>>(),
+                                        pl.in_sum,
+                                        pl.fold_host,
+                                        pl.hosted.is_some(),
+                                        pl.helper_pts.len()
+                                    )
                                 }
                             };
                             eprintln!("  MC{m}: {}{}", if taken(m, &fold_mc) { "[hosts a fold] " } else { "" }, why);
                         }
                     }
-                    let Some(m) = m else { return err(FitErrorKind::Capacity, format!("{}: no free macrocell for a foldback expander", c.name)) };
+                    let Some(m) = m else {
+                        return err(FitErrorKind::Capacity, format!("{}: no free macrocell for a foldback expander", c.name));
+                    };
                     fold_mc.insert((k.clone(), b), m as u16);
                 }
             }
         }
     }
-    let fold_at: BTreeMap<u16, Vec<(Signal, bool)>> =
-        fold_mc.iter().map(|((k, _), &m)| (m, fold_products[k].clone())).collect();
+    let fold_at: BTreeMap<u16, Vec<(Signal, bool)>> = fold_mc.iter().map(|((k, _), &m)| (m, fold_products[k].clone())).collect();
 
     Ok(Folds { fold_mc, fold_at })
 }
@@ -1441,9 +1454,7 @@ fn route_uim(dev: &'static Device, design: &Design, placed: &Placed, plans: &[Pt
         let mut need: Vec<(Source, String)> = vec![];
         for m in (b * 16 + 1)..=(b * 16 + 16) {
             let u = &uses[m];
-            let plan = u.cell.map(|i| &plans[i]).or_else(|| {
-                u.helper_for.and_then(|t| uses[t as usize].cell).map(|i| &plans[i])
-            });
+            let plan = u.cell.map(|i| &plans[i]).or_else(|| u.helper_for.and_then(|t| uses[t as usize].cell).map(|i| &plans[i]));
             let mut prods: Vec<&Vec<(Signal, bool)>> = vec![];
             if let Some(p) = fold_at.get(&(m as u16)) {
                 prods.push(p);
@@ -1545,12 +1556,15 @@ fn route_uim(dev: &'static Device, design: &Design, placed: &Placed, plans: &[Pt
                 .collect();
             feeders.sort();
             movable.extend(feeders);
-            FitError::new(FitErrorKind::Routing, format!(
-                "UIM routing failed for block {} ({} distinct inputs) [movable: {}]",
-                atf15xx_arch::block_letter(b),
-                need.len(),
-                movable.iter().map(|x| x.1.clone()).collect::<Vec<_>>().join(",")
-            ))
+            FitError::new(
+                FitErrorKind::Routing,
+                format!(
+                    "UIM routing failed for block {} ({} distinct inputs) [movable: {}]",
+                    atf15xx_arch::block_letter(b),
+                    need.len(),
+                    movable.iter().map(|x| x.1.clone()).collect::<Vec<_>>().join(",")
+                ),
+            )
         })?;
         let mut r = vec![];
         for ((src, name), (mux, chosen)) in need.iter().zip(assign) {
@@ -1562,13 +1576,21 @@ fn route_uim(dev: &'static Device, design: &Design, placed: &Placed, plans: &[Pt
         routing.insert(b, r);
     }
 
-
     Ok(Routing { routing, col_of, sel_of })
 }
 
 /// Fuse assembly (spec F5): UIM and GOE selections, global configuration, every macrocell.
 #[allow(clippy::too_many_arguments)]
-fn assemble(dev: &'static Device, design: Design, opts: &Options, placed: Placed, nets: &Nets, plans: &[PtPlan], folds: &Folds, routing: Routing) -> Result<FitResult, FitError> {
+fn assemble(
+    dev: &'static Device,
+    design: Design,
+    opts: &Options,
+    placed: Placed,
+    nets: &Nets,
+    plans: &[PtPlan],
+    folds: &Folds,
+    routing: Routing,
+) -> Result<FitResult, FitError> {
     let f = dev.family;
     let nmc = f.macrocells();
     let Placed { uses, mut placement, place_of, .. } = placed;
@@ -1756,7 +1778,8 @@ fn pt_demand(c: &Cell, xor: Option<&XorSplit>) -> usize {
     }
     if n > 1 {
         // the other polarity as an alternative cost; one too large to compute is no alternative
-        let alt = if c.active_low { c.data.0.len() } else { c.data.complement_within(COMPLEMENT_CHOICE_CUBES).map_or(usize::MAX, |x| x.0.len()) };
+        let alt =
+            if c.active_low { c.data.0.len() } else { c.data.complement_within(COMPLEMENT_CHOICE_CUBES).map_or(usize::MAX, |x| x.0.len()) };
         n = n.min(alt.max(1));
     }
     if n > 3 {
@@ -2059,8 +2082,7 @@ fn optimize_positions(design: &Design, place_of: &mut BTreeMap<String, Place>, m
         return;
     }
     let original = place_of.clone();
-    let mut at: BTreeMap<u16, String> =
-        design.cells.iter().filter_map(|c| mc_of(place_of, &c.name).map(|m| (m, c.name.clone()))).collect();
+    let mut at: BTreeMap<u16, String> = design.cells.iter().filter_map(|c| mc_of(place_of, &c.name).map(|m| (m, c.name.clone()))).collect();
     let is_movable: BTreeSet<&str> = movable.iter().map(|s| s.as_str()).collect();
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(1);
     let mut stale = 0;
@@ -2135,7 +2157,10 @@ fn pack_input_registers(
         }
         let Some((Signal::Pad(p), true)) = c.data.single_literal() else { continue };
         let Some(&Place::Pin { mc, .. }) = place_of.get(p) else { continue };
-        let taken = design.cells.iter().any(|o| matches!(place_of.get(&o.name), Some(Place::Pin { mc: m, .. } | Place::Node { mc: m }) if *m == mc));
+        let taken = design
+            .cells
+            .iter()
+            .any(|o| matches!(place_of.get(&o.name), Some(Place::Pin { mc: m, .. } | Place::Node { mc: m }) if *m == mc));
         // a macrocell reserved as a cascade helper still takes a PT-free input register
         if !design.inputs.contains_key(p) || taken || (reserved.contains(&mc) && !pt_free_input_register(c)) {
             continue;
@@ -2340,10 +2365,8 @@ fn factor_with_foldback(sum: &[Vec<(Signal, bool)>]) -> Option<Vec<Vec<(Signal, 
         }
     }
     let (c, members, _) = best?;
-    let mut fold: Vec<(Signal, bool)> = members
-        .iter()
-        .map(|&i| sum[i].iter().find(|x| !c.contains(x)).cloned().map(|(s, p)| (s, !p)).unwrap())
-        .collect();
+    let mut fold: Vec<(Signal, bool)> =
+        members.iter().map(|&i| sum[i].iter().find(|x| !c.contains(x)).cloned().map(|(s, p)| (s, !p)).unwrap()).collect();
     fold.sort();
     fold.dedup();
     if fold.windows(2).any(|w| w[0].0 == w[1].0) {
@@ -2351,8 +2374,7 @@ fn factor_with_foldback(sum: &[Vec<(Signal, bool)>]) -> Option<Vec<Vec<(Signal, 
     }
     let key = fold.iter().map(|(s, p)| format!("{}{}", if *p { "" } else { "!" }, s)).collect::<Vec<_>>().join("&");
     FOLDS.with(|f| f.borrow_mut().insert(key.clone(), fold));
-    let mut out: Vec<Vec<(Signal, bool)>> =
-        sum.iter().enumerate().filter(|(i, _)| !members.contains(i)).map(|(_, p)| p.clone()).collect();
+    let mut out: Vec<Vec<(Signal, bool)>> = sum.iter().enumerate().filter(|(i, _)| !members.contains(i)).map(|(_, p)| p.clone()).collect();
     let mut np = c;
     np.push((Signal::Fold(key), true));
     np.sort();
@@ -2370,7 +2392,8 @@ fn one_product(s: &Sop, cell: &str, what: &str) -> Result<Vec<(Signal, bool)>, F
         _ => {
             let c = m.complement();
             let c = if c.0.iter().flatten().any(|(s, p)| !p && matches!(s, Signal::Fold(_))) { Sop(vec![vec![]; 2]) } else { c };
-            let key_of = |p: &[(Signal, bool)]| p.iter().map(|(s, p)| format!("{}{}", if *p { "" } else { "!" }, s)).collect::<Vec<_>>().join("&");
+            let key_of =
+                |p: &[(Signal, bool)]| p.iter().map(|(s, p)| format!("{}{}", if *p { "" } else { "!" }, s)).collect::<Vec<_>>().join("&");
             if c.0.len() == 1 {
                 let key = key_of(&c.0[0]);
                 FOLDS.with(|f| f.borrow_mut().insert(key.clone(), c.0[0].clone()));
@@ -2379,19 +2402,18 @@ fn one_product(s: &Sop, cell: &str, what: &str) -> Result<Vec<(Signal, bool)>, F
                 // De Morgan with two foldback levels: p1 + ... + pk = !(!p1 & ... & !pk), where
                 // each !pi is the foldback of pi and the outer NAND is a foldback reading them:
                 // k + 1 foldback PTs of the block (at most 16) instead of a buried node.
-                let inner: Vec<(Signal, bool)> = m
-                    .0
-                    .iter()
-                    .map(|p| match p.as_slice() {
-                        // !l for a single literal comes straight from the UIM
-                        [(s, v)] if !matches!(s, Signal::Fold(_)) => (s.clone(), !v),
-                        _ => {
-                            let k = key_of(p);
-                            FOLDS.with(|f| f.borrow_mut().insert(k.clone(), p.clone()));
-                            (Signal::Fold(k), true)
-                        }
-                    })
-                    .collect();
+                let inner: Vec<(Signal, bool)> =
+                    m.0.iter()
+                        .map(|p| match p.as_slice() {
+                            // !l for a single literal comes straight from the UIM
+                            [(s, v)] if !matches!(s, Signal::Fold(_)) => (s.clone(), !v),
+                            _ => {
+                                let k = key_of(p);
+                                FOLDS.with(|f| f.borrow_mut().insert(k.clone(), p.clone()));
+                                (Signal::Fold(k), true)
+                            }
+                        })
+                        .collect();
                 let outer = format!("nand({})", inner.iter().map(|(s, _)| s.to_string()).collect::<Vec<_>>().join(","));
                 FOLDS.with(|f| f.borrow_mut().insert(outer.clone(), inner));
                 Ok(vec![(Signal::Fold(outer), true)])
@@ -2432,14 +2454,20 @@ fn write_pt(
                 return err(FitErrorKind::Other, format!("internal: inverted foldback literal {k} in a product term"));
             }
             let Some(&m) = fold_mc.get(&(k.clone(), b)) else {
-                return err(FitErrorKind::Other, format!("internal: MC{mc} reads foldback {k}, which has no expander in block {}", atf15xx_arch::block_letter(b)));
+                return err(
+                    FitErrorKind::Other,
+                    format!("internal: MC{mc} reads foldback {k}, which has no expander in block {}", atf15xx_arch::block_letter(b)),
+                );
             };
             fz.set(a + f.pt_foldback_column((m as usize - 1) % 16), false);
             continue;
         }
         let src = source_of(s)?;
         let Some(&mux) = col_of.get(&(b, src)) else {
-            return err(FitErrorKind::Other, format!("internal: PT{k} of MC{mc} reads {s}, which is not routed into block {}", atf15xx_arch::block_letter(b)));
+            return err(
+                FitErrorKind::Other,
+                format!("internal: PT{k} of MC{mc} reads {s}, which is not routed into block {}", atf15xx_arch::block_letter(b)),
+            );
         };
         fz.set(a + f.pt_input_column(mux, !pos), false);
     }
@@ -2451,10 +2479,29 @@ fn encode_unused(pad_used: bool, set: &mut dyn FnMut(McBit, bool)) {
     use McBit::*;
     // observed vendor patterns (see docs/architecture/fitter/04-fuse-map.md)
     let unused = [
-        (OeMux0, false), (OeMux1, false), (Pt5Func, true), (OeMux2, false), (OMux, true), (GclrMux, true),
-        (Storage, false), (DMux, true), (Slew, true), (Pt4Func, true), (Pt1Mux, false), (CasMux, false),
-        (Gclk0, false), (Gclk1, false), (PtPowerOff, true), (Pt2Mux, false), (XorB, false), (Pt5Mux, false),
-        (Invert, false), (Pt3Mux, false), (Pt4Mux, false), (OpenDrain, false), (FbMux, true),
+        (OeMux0, false),
+        (OeMux1, false),
+        (Pt5Func, true),
+        (OeMux2, false),
+        (OMux, true),
+        (GclrMux, true),
+        (Storage, false),
+        (DMux, true),
+        (Slew, true),
+        (Pt4Func, true),
+        (Pt1Mux, false),
+        (CasMux, false),
+        (Gclk0, false),
+        (Gclk1, false),
+        (PtPowerOff, true),
+        (Pt2Mux, false),
+        (XorB, false),
+        (Pt5Mux, false),
+        (Invert, false),
+        (Pt3Mux, false),
+        (Pt4Mux, false),
+        (OpenDrain, false),
+        (FbMux, true),
     ];
     for (b, v) in unused {
         set(b, v);
@@ -2563,8 +2610,7 @@ pub fn route_block_alt(f: Family, need: &[Vec<Source>]) -> Option<Vec<(usize, So
 }
 
 pub fn route_block(f: Family, need: &[Source]) -> Option<Vec<usize>> {
-    let cands: Vec<Vec<usize>> =
-        need.iter().map(|s| (0..40).filter(|&m| f.uim_choices(m).contains(s)).collect()).collect();
+    let cands: Vec<Vec<usize>> = need.iter().map(|s| (0..40).filter(|&m| f.uim_choices(m).contains(s)).collect()).collect();
     let mut owner: [Option<usize>; 40] = [None; 40];
     fn augment(i: usize, cands: &[Vec<usize>], owner: &mut [Option<usize>; 40], seen: &mut [bool; 40]) -> bool {
         for &m in &cands[i] {

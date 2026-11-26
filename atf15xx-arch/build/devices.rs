@@ -41,20 +41,14 @@ impl Dev {
 }
 
 fn pinmap(v: &Value) -> Vec<(u16, u16)> {
-    let mut out: Vec<(u16, u16)> = v
-        .as_object()
-        .unwrap()
-        .iter()
-        .map(|(p, m)| (p.parse().unwrap(), m.as_u64().unwrap() as u16))
-        .collect();
+    let mut out: Vec<(u16, u16)> = v.as_object().unwrap().iter().map(|(p, m)| (p.parse().unwrap(), m.as_u64().unwrap() as u16)).collect();
     out.sort();
     out
 }
 
 pub fn load(text: &str) -> Vec<Dev> {
     let v: Value = serde_json::from_str(text).expect("devices.json");
-    let n =
-        |d: &Value, k: &str| d[k].as_u64().unwrap_or_else(|| panic!("devices.json: {k}")) as u16;
+    let n = |d: &Value, k: &str| d[k].as_u64().unwrap_or_else(|| panic!("devices.json: {k}")) as u16;
     v.as_object()
         .unwrap()
         .iter()
@@ -65,12 +59,7 @@ pub fn load(text: &str) -> Vec<Dev> {
             tt2_device: d["tt2_device"].as_str().unwrap().into(),
             pins: pinmap(&d["pins"]),
             input_only: pinmap(&d["input_only"]),
-            jtag: [
-                n(&d["jtag"], "tdi"),
-                n(&d["jtag"], "tms"),
-                n(&d["jtag"], "tck"),
-                n(&d["jtag"], "tdo"),
-            ],
+            jtag: [n(&d["jtag"], "tdi"), n(&d["jtag"], "tms"), n(&d["jtag"], "tck"), n(&d["jtag"], "tdo")],
             pd1: n(d, "pd1"),
             pd2: n(d, "pd2"),
             gclk1: n(d, "gclk1"),
@@ -83,12 +72,7 @@ pub fn load(text: &str) -> Vec<Dev> {
 }
 
 pub fn emit(devs: &[Dev]) -> String {
-    let pairs = |v: &[(u16, u16)]| {
-        v.iter()
-            .map(|(a, b)| format!("({a}, {b})"))
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
+    let pairs = |v: &[(u16, u16)]| v.iter().map(|(a, b)| format!("({a}, {b})")).collect::<Vec<_>>().join(", ");
     let mut o = format!("pub(crate) static DEVICES: [Device; {}] = [\n", devs.len());
     for d in devs {
         o += &format!(

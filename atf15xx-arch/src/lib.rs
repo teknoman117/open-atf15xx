@@ -119,12 +119,7 @@ impl Family {
     pub fn mc_bit_addr(self, mc: usize, bit: McBit) -> usize {
         let (pair, k) = bit.location();
         let (b, l) = ((mc - 1) / 16, (mc - 1) % 16);
-        let f = self
-            .data()
-            .mcfg_fields
-            .iter()
-            .find(|f| f.block == b && (f.pair[0], f.pair[1]) == pair)
-            .expect("mcfg field");
+        let f = self.data().mcfg_fields.iter().find(|f| f.block == b && (f.pair[0], f.pair[1]) == pair).expect("mcfg field");
         let forward = FORWARD_PAIRS.contains(&pair) != matches!(self, Family::F1502);
         let s = if forward { l } else { 15 - l };
         f.addr + 2 * s + (usize::from(k) ^ (s & 1))
@@ -205,7 +200,6 @@ pub fn block_letter(b: usize) -> char {
     (b'A' + b as u8) as char
 }
 
-
 /// The 24 per-macrocell configuration bits. Names follow the function each bit was observed to
 /// control; where one fuse serves two functions both are named (see the docs for the full
 /// routing tables). Values are the raw fuse values.
@@ -260,10 +254,30 @@ pub enum McBit {
 
 impl McBit {
     pub const ALL: [McBit; 24] = [
-        McBit::OeMux0, McBit::OeMux1, McBit::Pt5Func, McBit::OeMux2, McBit::OMux, McBit::GclrMux,
-        McBit::Storage, McBit::DMux, McBit::Slew, McBit::Pt4Func, McBit::Pt1Mux, McBit::CasMux,
-        McBit::Gclk0, McBit::Gclk1, McBit::LowPower, McBit::PtPowerOff, McBit::Pt2Mux, McBit::XorB,
-        McBit::Pt5Mux, McBit::Invert, McBit::Pt3Mux, McBit::Pt4Mux, McBit::OpenDrain, McBit::FbMux,
+        McBit::OeMux0,
+        McBit::OeMux1,
+        McBit::Pt5Func,
+        McBit::OeMux2,
+        McBit::OMux,
+        McBit::GclrMux,
+        McBit::Storage,
+        McBit::DMux,
+        McBit::Slew,
+        McBit::Pt4Func,
+        McBit::Pt1Mux,
+        McBit::CasMux,
+        McBit::Gclk0,
+        McBit::Gclk1,
+        McBit::LowPower,
+        McBit::PtPowerOff,
+        McBit::Pt2Mux,
+        McBit::XorB,
+        McBit::Pt5Mux,
+        McBit::Invert,
+        McBit::Pt3Mux,
+        McBit::Pt4Mux,
+        McBit::OpenDrain,
+        McBit::FbMux,
     ];
 
     /// `(S-label pair (lower, higher), k)`: the bit is the `k`-th of the two bits of its macrocell

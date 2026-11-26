@@ -7,7 +7,11 @@ mod cli_jtag;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "atf15xx-tool", version, about = "Programming files (ATMISP-compatible SVF) and in-circuit debugging (JTAG boundary scan) for ATF15xx CPLDs")]
+#[command(
+    name = "atf15xx-tool",
+    version,
+    about = "Programming files (ATMISP-compatible SVF) and in-circuit debugging (JTAG boundary scan) for ATF15xx CPLDs"
+)]
 struct Cli {
     #[command(flatten)]
     jtag: cli_jtag::JtagArgs,

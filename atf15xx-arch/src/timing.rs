@@ -19,10 +19,7 @@ pub fn params(family: Family) -> &'static [(&'static str, [f64; 5])] {
 
 /// One parameter at one grade.
 pub fn value(family: Family, name: &str, grade: usize) -> Option<f64> {
-    params(family)
-        .iter()
-        .find(|p| p.0 == name)
-        .map(|p| p.1[grade])
+    params(family).iter().find(|p| p.0 == name).map(|p| p.1[grade])
 }
 
 #[cfg(test)]

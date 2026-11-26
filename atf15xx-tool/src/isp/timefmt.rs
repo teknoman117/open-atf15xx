@@ -27,9 +27,6 @@ mod tests {
     #[test]
     fn ctime_format() {
         // 2026-11-05 09:03:07 UTC was a Thursday
-        assert_eq!(
-            super::from_epoch_utc(1793869387).unwrap(),
-            "Thu Nov  5 09:03:07 2026"
-        );
+        assert_eq!(super::from_epoch_utc(1793869387).unwrap(), "Thu Nov  5 09:03:07 2026");
     }
 }

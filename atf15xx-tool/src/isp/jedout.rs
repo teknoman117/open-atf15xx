@@ -24,11 +24,7 @@ pub fn fuses_from_image(f: Family, img: &DeviceImage) -> Vec<u8> {
             }
         }
     }
-    for (idx, data) in [
-        (&map.special, &img.special),
-        (&map.ues, &img.ues),
-        (&map.config, &img.config),
-    ] {
+    for (idx, data) in [(&map.special, &img.special), (&map.ues, &img.ues), (&map.config, &img.config)] {
         for (k, &i) in idx.iter().enumerate() {
             if i >= 0 {
                 fz[i as usize] = data[k];

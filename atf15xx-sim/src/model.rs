@@ -33,7 +33,15 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        Options { reset_wins: true, power_up: false, power_up_from_fuse: false, cascade_requires_pts: true, lender_a_is_one: true, idle_mc_holds: true, oe_pt5_needs_mux: true }
+        Options {
+            reset_wins: true,
+            power_up: false,
+            power_up_from_fuse: false,
+            cascade_requires_pts: true,
+            lender_a_is_one: true,
+            idle_mc_holds: true,
+            oe_pt5_needs_mux: true,
+        }
     }
 }
 
@@ -170,11 +178,7 @@ impl Model {
     pub fn new(device: &'static Device, fuses: &[bool], opts: Options) -> Model {
         let family = device.family;
         let d = decode::decode(family, fuses);
-        let jtag_pins: Vec<u16> = if d.jtag {
-            vec![device.jtag.tdi, device.jtag.tms, device.jtag.tck, device.jtag.tdo]
-        } else {
-            vec![]
-        };
+        let jtag_pins: Vec<u16> = if d.jtag { vec![device.jtag.tdi, device.jtag.tms, device.jtag.tck, device.jtag.tdo] } else { vec![] };
         let mut pins: Vec<(u16, PinKind)> = vec![];
         for (p, m) in device.io_pins() {
             if !jtag_pins.contains(&p) {
@@ -194,9 +198,7 @@ impl Model {
             }
         }
         pins.sort_by_key(|x| x.0);
-        let pin_of_mc = |mc: u16| {
-            pins.iter().find_map(|&(p, k)| if k == PinKind::Io(mc) { Some(p) } else { None })
-        };
+        let pin_of_mc = |mc: u16| pins.iter().find_map(|&(p, k)| if k == PinKind::Io(mc) { Some(p) } else { None });
         let n = family.macrocells();
         let mut mcs: Vec<Mc> = Vec::with_capacity(n);
         for c in &d.macrocells {
@@ -208,9 +210,7 @@ impl Model {
                 pts[k] = c.pts[k].as_ref().map(|lits| {
                     lits.iter()
                         .map(|l| match *l {
-                            Literal::Uim { mux, positive } => {
-                                Lit::Sig(sig_of(device, d.uim[block][mux as usize]), positive)
-                            }
+                            Literal::Uim { mux, positive } => Lit::Sig(sig_of(device, d.uim[block][mux as usize]), positive),
                             Literal::Foldback { local } => Lit::Fold((block * 16 + local as usize + 1) as u16),
                         })
                         .collect()

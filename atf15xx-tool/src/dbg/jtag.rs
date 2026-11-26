@@ -82,12 +82,7 @@ impl OpenOcd {
         for c in &cfg.commands {
             args.extend(["-c".into(), c.clone()]);
         }
-        args.extend([
-            "-c".into(),
-            format!("adapter speed {}", cfg.speed),
-            "-c".into(),
-            "transport select jtag".into(),
-        ]);
+        args.extend(["-c".into(), format!("adapter speed {}", cfg.speed), "-c".into(), "transport select jtag".into()]);
         let tap = match part {
             Some(p) => {
                 let ids: String = p.idcodes.iter().map(|id| format!(" -expected-id 0x{id:08x}")).collect();

@@ -1,0 +1,4 @@
+# The project style: long lines (the code base was written at ~140 columns), compact
+# small items. Run `cargo fmt --all` after every set of Rust changes.
+max_width = 140
+use_small_heuristics = "Max"

@@ -52,22 +52,15 @@ impl Part {
     }
 
     pub fn opcode(&self, name: &str) -> Result<u64> {
-        self.opcodes
-            .get(name)
-            .copied()
-            .ok_or_else(|| anyhow!("{}: no {name} instruction", self.name))
+        self.opcodes.get(name).copied().ok_or_else(|| anyhow!("{}: no {name} instruction", self.name))
     }
 
     pub fn cell(&self, name: &str) -> Option<&Cell> {
-        self.cells
-            .iter()
-            .find(|c| c.name().eq_ignore_ascii_case(name))
+        self.cells.iter().find(|c| c.name().eq_ignore_ascii_case(name))
     }
 
     pub fn mc_cell(&self, mc: u16, kind: CellKind) -> Option<&Cell> {
-        self.cells
-            .iter()
-            .find(|c| c.mc == Some(mc) && c.kind == kind)
+        self.cells.iter().find(|c| c.mc == Some(mc) && c.kind == kind)
     }
 
     pub fn macrocells(&self) -> u16 {
@@ -78,8 +71,5 @@ impl Part {
 /// The BSDL files whose IDCODE matches `id` (e.g. `1508AS_J84.BSD`): identifies a die (the
 /// IDCODE names the device and voltage, not the package).
 pub fn identify(id: u32) -> Vec<String> {
-    atf15xx_arch::bsdl::identify(id)
-        .into_iter()
-        .map(String::from)
-        .collect()
+    atf15xx_arch::bsdl::identify(id).into_iter().map(String::from).collect()
 }

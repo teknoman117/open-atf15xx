@@ -12,8 +12,8 @@ fn vendor_identical_fuses() {
     let (mut ok, mut bad) = (0, vec![]);
     for fam in Family::ALL {
         let dir = root.join(fam.number());
-        let mut names: Vec<PathBuf> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().path())
-            .filter(|p| p.extension().map_or(false, |e| e == "tt2")).collect();
+        let mut names: Vec<PathBuf> =
+            std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().path()).filter(|p| p.extension().map_or(false, |e| e == "tt2")).collect();
         names.sort();
         for tt2 in names {
             let stem = tt2.file_stem().unwrap().to_string_lossy().to_string();
@@ -43,12 +43,16 @@ fn vendor_identical_fuses() {
 fn decode_vendor_jed() {
     use atf15xx_arch::decode::*;
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/vectors/1504");
-    let name = std::fs::read_dir(&root).unwrap().map(|e| e.unwrap().path())
-        .find(|p| p.to_string_lossy().contains("dff_g1_") && p.extension().map_or(false, |e| e == "jed")).unwrap();
+    let name = std::fs::read_dir(&root)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.to_string_lossy().contains("dff_g1_") && p.extension().map_or(false, |e| e == "jed"))
+        .unwrap();
     let fz = atf15xx_fit::jed::parse(&String::from_utf8_lossy(&std::fs::read(&name).unwrap())).unwrap();
     let d = decode(Family::F1504, &fz.bits);
     // vendor dff_g1 designs: Y.D = A clocked by GCLK1, always-enabled pin output
-    let y: Vec<&MacrocellConfig> = d.macrocells.iter().filter(|m| m.storage == Storage::DFlipFlop && m.output == Tap::Reg && m.uses_pts()).collect();
+    let y: Vec<&MacrocellConfig> =
+        d.macrocells.iter().filter(|m| m.storage == Storage::DFlipFlop && m.output == Tap::Reg && m.uses_pts()).collect();
     assert_eq!(y.len(), 1);
     assert_eq!(y[0].clock, ClockSource::Global(1));
     assert_eq!(y[0].oe, OutputEnable::Always);

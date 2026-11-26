@@ -37,7 +37,12 @@ enum Cli {
     },
 }
 
-fn fit(netlist: &Option<PathBuf>, tt2: &Option<PathBuf>, device: &str, acf: &Option<PathBuf>) -> Result<atf15xx_fit::fit::FitResult, String> {
+fn fit(
+    netlist: &Option<PathBuf>,
+    tt2: &Option<PathBuf>,
+    device: &str,
+    acf: &Option<PathBuf>,
+) -> Result<atf15xx_fit::fit::FitResult, String> {
     if let Some(n) = netlist {
         let text = std::fs::read_to_string(n).map_err(|e| e.to_string())?;
         let mut o = atf15xx_synth::flow::FlowOptions { part: Some(device.to_string()), ..Default::default() };
@@ -63,7 +68,10 @@ fn fit(netlist: &Option<PathBuf>, tt2: &Option<PathBuf>, device: &str, acf: &Opt
             let words: Vec<String> = line.split_whitespace().skip(2).map(String::from).collect();
             let mut i = 0;
             while i < words.len() {
-                let Some(k) = words[i].strip_prefix('-') else { i += 1; continue };
+                let Some(k) = words[i].strip_prefix('-') else {
+                    i += 1;
+                    continue;
+                };
                 let mut key = k.to_string();
                 i += 1;
                 if key.eq_ignore_ascii_case("strategy") && i < words.len() {

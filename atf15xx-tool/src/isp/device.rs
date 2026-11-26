@@ -12,14 +12,7 @@ pub enum Family {
 }
 
 impl Family {
-    pub const ALL: [Family; 6] = [
-        Family::F1502AS,
-        Family::F1504AS,
-        Family::F1508AS,
-        Family::F1502BE,
-        Family::F1504BE,
-        Family::F1508BE,
-    ];
+    pub const ALL: [Family; 6] = [Family::F1502AS, Family::F1504AS, Family::F1508AS, Family::F1502BE, Family::F1504BE, Family::F1508BE];
 
     pub fn qf(self) -> usize {
         match self {
@@ -151,10 +144,7 @@ impl Instr {
 
     /// Instructions whose JEDEC file is read (§3.1).
     pub fn reads_jedec(self) -> bool {
-        matches!(
-            self,
-            Instr::ProgramVerify | Instr::Verify | Instr::ProgramVerifySecure
-        )
+        matches!(self, Instr::ProgramVerify | Instr::Verify | Instr::ProgramVerifySecure)
     }
 
     /// Instructions whose verify scans carry a MASK (§7.3 CHECK).
@@ -167,11 +157,7 @@ impl Instr {
         if s.len() == 1 && s.as_bytes()[0].is_ascii_digit() {
             return Some(Instr::from_code(s));
         }
-        let k: String = s
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric())
-            .collect::<String>()
-            .to_ascii_lowercase();
+        let k: String = s.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_ascii_lowercase();
         Some(match k.as_str() {
             "bypass" => Instr::Bypass,
             "programverify" | "pv" | "program" => Instr::ProgramVerify,
@@ -263,10 +249,10 @@ pub enum VClass {
 
 pub fn voltage_class(n: &str) -> Option<VClass> {
     match n {
-        "ATF1502AS" | "ATF1502ASL" | "ATF1502SE" | "ATF1502SEL" | "ATF1504AS" | "ATF1504ASL"
-        | "ATF1508AS" | "ATF1508ASL" => Some(VClass::V5),
-        "ATF1502ASV" | "ATF1502ASVL" | "ATF1504ASV" | "ATF1504ASVL" | "ATF1508ASV"
-        | "ATF1508ASVL" => Some(VClass::V3),
+        "ATF1502AS" | "ATF1502ASL" | "ATF1502SE" | "ATF1502SEL" | "ATF1504AS" | "ATF1504ASL" | "ATF1508AS" | "ATF1508ASL" => {
+            Some(VClass::V5)
+        }
+        "ATF1502ASV" | "ATF1502ASVL" | "ATF1504ASV" | "ATF1504ASVL" | "ATF1508ASV" | "ATF1508ASVL" => Some(VClass::V3),
         "ATF1502BE" | "ATF1504BE" | "ATF1508BE" | "ATF1508RE" => Some(VClass::BE),
         _ => None,
     }
