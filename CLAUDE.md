@@ -58,6 +58,8 @@ tools/sim/run.sh python3 tools/sim/equiv.py out/design.jed --device P1504C44 \
 
 ## Code
 
+- Run `cargo fmt --all` after every set of Rust changes (config: `rustfmt.toml`), before building,
+  testing and committing.
 - Rust. Use widely used upstream crates (clap, chrono, serde/serde_json, flate2, …) instead of
   hand-rolled code or libc FFI; check the current version before adding one.
 - Workspace crates (top-level directories, version 0.1.0, licence ISC): `atf15xx-arch`,
