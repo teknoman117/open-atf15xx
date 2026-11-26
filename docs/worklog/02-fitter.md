@@ -107,6 +107,16 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — `fit_attempt` (1165 lines) split into its passes (user request): `place_cells`
+  → `global_nets` → `plan_pts` → `host_foldbacks` → `route_uim` → `assemble`, with the state
+  they hand on in `Placed`, `Nets`, `Folds`, `Routing`; `fit_attempt` is the 15-line driver.
+  The pass bodies moved unchanged (each destructures its inputs into the old local names); the
+  closures shared across passes became functions (`signal_source`, `placed_pin`,
+  `gclk_net_of_pin`); the `FOLD_MC` thread-local is gone (`write_pt` takes the expander map).
+  Checks: vendor identity unchanged (2017 / 4025 / 6155), corpus (37) and examples
+  byte-identical, SELFPROGRAMBOARD unchanged, tests 48/48. Edge sweep after the time work
+  (`.scratch/mploop/edge-v2.json`): 198 builds 15,537 → 4,190 s, timeouts (180 s) 48 → 0; the
+  registered compare now fits up to 30 bits on the ATF1508AS (was 14).
 * **2026-11-26** — Time to failure, continued (16-bit registered compare, ATF1508AS-TQFP100):
   gate mapping 126 → 5.0 s, word mapping 324 → 8.3 s, same fits (54 / 65 MCs). (1) `pt_demand`'s
   foldback-factoring estimate is memoised per thread (`factored_len`): each of the 7 fit attempts

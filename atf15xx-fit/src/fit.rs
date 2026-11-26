@@ -441,11 +441,106 @@ fn fit_attempt(
     placer: Placer,
 ) -> Result<FitResult, FitError> {
     uim_memo_clear();
+    // the passes of one attempt (spec F4): placement, global networks, product-term plans,
+    // foldback expanders, UIM routing, fuse assembly
+    let mut placed = place_cells(dev, &mut design, opts, fanin_limit, extra_pairs, avoid, placer)?;
+    let mut nets = global_nets(dev, &design, opts, &placed);
+    let mut plans = plan_pts(dev, &design, opts, &mut placed, &mut nets)?;
+    let folds = host_foldbacks(&design, opts, &mut placed, &mut plans)?;
+    let routing = route_uim(dev, &design, &placed, &plans, &folds)?;
+    assemble(dev, design, opts, placed, &nets, &plans, &folds, routing)
+}
+
+/// What placement decided: every cell's and input's place, and the macrocell uses.
+struct Placed {
+    uses: Vec<McUse>,
+    placement: Vec<(String, Place)>,
+    place_of: BTreeMap<String, Place>,
+    host_of: BTreeMap<usize, usize>,
+    fast_in: BTreeSet<String>,
+}
+
+/// The global networks: GCLK sources and polarities, and (filled while planning) the GCLR
+/// polarity and the GOE assignments.
+struct Nets {
+    gclk_net: [Option<(u8, bool)>; 3],
+    gclr_inv: Option<bool>,
+    goe: BTreeMap<u8, (Source, bool)>,
+}
+
+/// Foldback expanders: the macrocell of every (foldback, block), and the product each hosts.
+struct Folds {
+    fold_mc: BTreeMap<(String, usize), u16>,
+    fold_at: BTreeMap<u16, Vec<(Signal, bool)>>,
+}
+
+/// UIM routing: per block the muxes used, and the column / selection of every source.
+struct Routing {
+    routing: BTreeMap<usize, Vec<(usize, String, String)>>,
+    col_of: BTreeMap<(usize, Source), usize>,
+    sel_of: BTreeMap<(usize, usize), Source>,
+}
+
+/// Where a signal enters the UIM: its pad, a dedicated input, or a macrocell feedback.
+fn signal_source(design: &Design, place_of: &BTreeMap<String, Place>, s: &Signal) -> Result<Source, FitError> {
+    match s {
+        Signal::Pad(n) => match place_of.get(n) {
+            Some(Place::Pin { mc, .. }) => Ok(Source::Pad(*mc)),
+            Some(Place::Dedicated { func, .. }) => Ok(match func {
+                Dedicated::Gclk1 => Source::Gclk1,
+                Dedicated::Gclr => Source::Gclr,
+                Dedicated::Oe1 => Source::Oe1,
+                Dedicated::Gclk2Oe2 => Source::Oe2,
+            }),
+            _ => err(FitErrorKind::Other, format!("signal {n} has no pad")),
+        },
+        Signal::Fold(k) => err(FitErrorKind::Other, format!("foldback {k} is not a UIM source")),
+        Signal::Fb(n, _) => match place_of.get(n) {
+            // an always-enabled output's feedback equals its pin: the vendor routes the pad
+            Some(Place::Pin { mc, .. }) if design.cell(n).map_or(false, |c| c.oe.is_none()) => Ok(Source::Pad(*mc)),
+            Some(Place::Pin { mc, .. }) | Some(Place::Node { mc }) => Ok(Source::Fb(*mc)),
+            _ => err(FitErrorKind::Other, format!("signal {n} has no feedback")),
+        },
+    }
+}
+
+/// The GCLK network (1..=3) a dedicated clock pin drives directly, if it is one.
+fn gclk_net_of_pin(dev: &Device, pin: u16) -> Option<u8> {
+    if pin == dev.gclk1 {
+        Some(1)
+    } else if pin == dev.gclk2_oe2 {
+        Some(2)
+    } else if pin == dev.gclk3 {
+        Some(3)
+    } else {
+        None
+    }
+}
+
+/// The pin a placed input or output sits on.
+fn placed_pin(place_of: &BTreeMap<String, Place>, n: &str) -> Option<u16> {
+    match place_of.get(n)? {
+        Place::Pin { pin, .. } | Place::Dedicated { pin, .. } => Some(*pin),
+        Place::Node { .. } => None,
+    }
+}
+
+/// Placement (spec F4.4–F4.6): inputs and dedicated pins, pinned cells, outputs, logic doubling
+/// hosts, fast input registers, buried nodes, and (partitioning placer) their positions.
+fn place_cells(
+    dev: &'static Device,
+    design: &mut Design,
+    opts: &Options,
+    fanin_limit: usize,
+    extra_pairs: usize,
+    avoid: &BTreeSet<(String, u16)>,
+    placer: Placer,
+) -> Result<Placed, FitError> {
     let partition = placer != Placer::Greedy;
     let f = dev.family;
     let nmc = f.macrocells();
     let mut uses = vec![McUse::default(); nmc + 1];
-    let mut placement: Vec<(String, Place)> = vec![];
+    let placement: Vec<(String, Place)> = vec![];
     let mut place_of: BTreeMap<String, Place> = BTreeMap::new();
     let jtag_pins: Vec<u16> = if opts.jtag {
         vec![dev.jtag.tdi, dev.jtag.tms, dev.jtag.tck, dev.jtag.tdo]
@@ -677,7 +772,7 @@ fn fit_attempt(
                         && demand[*yi] + extra <= 5
                         && (y.oe.is_none() || !design.cells.iter().any(|o| o.inputs().contains(&Signal::Fb(y.name.clone(), false))))
                         && place_of.contains_key(&y.name)
-                        && fanin_ok(&design, &place_of, (mc_of(&place_of, &y.name) - 1) / 16, r, fanin_limit)
+                        && fanin_ok(design, &place_of, (mc_of(&place_of, &y.name) - 1) / 16, r, fanin_limit)
                         && !avoid.contains(&(r.name.clone(), (mc_of(&place_of, &y.name) - 1) / 16))
                 });
                 if let Some((yi, _)) = host {
@@ -709,7 +804,7 @@ fn fit_attempt(
                 design.cells.len(), helpers, nmc, need, host_of.len()
             );
         }
-        for (&ri, &yi) in &host_of {
+        for (&ri, &yi) in host_of.iter() {
             let mc = mc_of(&place_of, &design.cells[yi].name);
             place_of.insert(design.cells[ri].name.clone(), Place::Node { mc });
         }
@@ -718,7 +813,7 @@ fn fit_attempt(
     // block assignment for the floating buried cells (spec F9.4), only when the greedy placement
     // alone has failed
     let assigned: BTreeMap<String, u16> = if partition {
-        partition_blocks(&design, &place_of, &reserved_mcs, &demand, (nmc / 16) as u16, avoid, fanin_limit)
+        partition_blocks(design, &place_of, &reserved_mcs, &demand, (nmc / 16) as u16, avoid, fanin_limit)
     } else {
         BTreeMap::new()
     };
@@ -727,7 +822,7 @@ fn fit_attempt(
     // macrocell with D from the pad, before the buried-cell phases hand that macrocell out
     let mut fast_in: BTreeSet<String> = BTreeSet::new();
     if opts.pack_input_registers {
-        pack_input_registers(&design, &mut place_of, &reserved_mcs, fanin_limit, avoid, &mut fast_in, &mut share);
+        pack_input_registers(design, &mut place_of, &reserved_mcs, fanin_limit, avoid, &mut fast_in, &mut share);
     }
     // floating buried cells, phase 1: lowest block first, highest macrocell whose pin is not
     // usable (unbonded, or reserved for JTAG / power-down)
@@ -757,7 +852,7 @@ fn fit_attempt(
                     && !cell_mcs.contains(&m)
                     && !reserved_mcs.contains(&m)
                     && helpers_free(m, demand[design.cell_index(&c.name).unwrap()], &place_of, &reserved_mcs, &share)
-                    && fanin_ok(&design, &place_of, (m - 1) / 16, c, fanin_limit)
+                    && fanin_ok(design, &place_of, (m - 1) / 16, c, fanin_limit)
                     && !avoid.contains(&(c.name.clone(), (m - 1) / 16))
                     && in_assigned(&c.name, m)
             });
@@ -827,7 +922,7 @@ fn fit_attempt(
     }
     // input registers whose pin was placed only now
     if opts.pack_input_registers {
-        pack_input_registers(&design, &mut place_of, &reserved_mcs, fanin_limit, avoid, &mut fast_in, &mut share);
+        pack_input_registers(design, &mut place_of, &reserved_mcs, fanin_limit, avoid, &mut fast_in, &mut share);
     }
     // floating buried cells, phase 2: macrocells whose pad is an input, then any free one
     for c in &design.cells {
@@ -847,7 +942,7 @@ fn fit_attempt(
                 && !cell_mcs.contains(&m)
                 && !reserved_mcs.contains(&m)
                 && helpers_free(m, d, &place_of, &reserved_mcs, &share)
-                && fanin_ok(&design, &place_of, (m - 1) / 16, c, fanin_limit)
+                && fanin_ok(design, &place_of, (m - 1) / 16, c, fanin_limit)
         };
         let pick = order
             .iter()
@@ -865,7 +960,7 @@ fn fit_attempt(
                         continue;
                     }
                     let mut lim = 0;
-                    while !fanin_ok(&design, &place_of, (m - 1) / 16, c, lim) {
+                    while !fanin_ok(design, &place_of, (m - 1) / 16, c, lim) {
                         lim += 1;
                     }
                     if best.map_or(true, |(l, _)| lim < l) {
@@ -908,7 +1003,7 @@ fn fit_attempt(
             })
             .map(|(_, c)| c.name.clone())
             .collect();
-        optimize_positions(&design, &mut place_of, &movable, &reserved_mcs, f);
+        optimize_positions(design, &mut place_of, &movable, &reserved_mcs, f);
     }
     for (i, c) in design.cells.iter().enumerate() {
         let mc = match place_of[&c.name] {
@@ -925,24 +1020,15 @@ fn fit_attempt(
         uses[mc as usize].cell = Some(i);
     }
 
+    Ok(Placed { uses, placement, place_of, host_of, fast_in })
+}
+
+/// Global clock networks (spec F4.5): which pin feeds which network, in which polarity.
+fn global_nets(dev: &'static Device, design: &Design, opts: &Options, placed: &Placed) -> Nets {
+    let Placed { place_of, .. } = placed;
+    let net_of_pin = |pin: u16| gclk_net_of_pin(dev, pin);
+    let pin_of_name = |n: &str| placed_pin(place_of, n);
     // ---- global nets
-    let net_of_pin = |pin: u16| -> Option<u8> {
-        if pin == dev.gclk1 {
-            Some(1)
-        } else if pin == dev.gclk2_oe2 {
-            Some(2)
-        } else if pin == dev.gclk3 {
-            Some(3)
-        } else {
-            None
-        }
-    };
-    let pin_of_name = |n: &str| -> Option<u16> {
-        match place_of.get(n)? {
-            Place::Pin { pin, .. } | Place::Dedicated { pin, .. } => Some(*pin),
-            Place::Node { .. } => None,
-        }
-    };
     // GCLK networks: `gclk_net[n-1] = (clock pin k, positive)` -- network n takes clock pin k
     // (1 = GCLK1, 2 = GCLK2/OE2, 3 = GCLK3 I/O) through its source mux and inverts it unless
     // positive. The invert bit is per network: when cells clock on both edges of one clock pin,
@@ -954,7 +1040,7 @@ fn fit_attempt(
         let mut votes: BTreeMap<u8, (usize, usize)> = BTreeMap::new();
         for c in &design.cells {
             if let Some((Signal::Pad(n), pos)) = c.clk.as_ref().and_then(|f| f.single_literal()) {
-                if let Some(net) = pin_of_name(&n).and_then(net_of_pin) {
+                if let Some(net) = pin_of_name(n).and_then(net_of_pin) {
                     let w = if c.ce.is_some() { 1000 } else { 1 };
                     let v = votes.entry(net).or_default();
                     if pos { v.0 += w } else { v.1 += w }
@@ -974,32 +1060,21 @@ fn fit_attempt(
             }
         }
     }
-    let net_for = |k: u8, pos: bool| -> Option<u8> { (0..3u8).find(|&i| gclk_net[i as usize] == Some((k, pos))).map(|i| i + 1) };
-    let mut gclr_inv = None::<bool>;
-    let mut goe: BTreeMap<u8, (Source, bool)> = BTreeMap::new();
 
+    Nets { gclk_net, gclr_inv: None, goe: BTreeMap::new() }
+}
+
+/// Product-term plans (spec F4.3): every cell's sum, polarity, special PTs, global-net uses and
+/// cascade helpers.
+fn plan_pts(dev: &'static Device, design: &Design, opts: &Options, placed: &mut Placed, nets: &mut Nets) -> Result<Vec<PtPlan>, FitError> {
+    let f = dev.family;
+    let Placed { uses, place_of, host_of, fast_in, .. } = placed;
+    let Nets { gclk_net, gclr_inv, goe } = nets;
+    let net_of_pin = |pin: u16| gclk_net_of_pin(dev, pin);
+    let pin_of_name = |n: &str| placed_pin(place_of, n);
+    let net_for = |k: u8, pos: bool| -> Option<u8> { (0..3u8).find(|&i| gclk_net[i as usize] == Some((k, pos))).map(|i| i + 1) };
+    let source_of = |s: &Signal| signal_source(design, place_of, s);
     // ---- PT plans
-    let source_of = |s: &Signal| -> Result<Source, FitError> {
-        match s {
-            Signal::Pad(n) => match place_of.get(n) {
-                Some(Place::Pin { mc, .. }) => Ok(Source::Pad(*mc)),
-                Some(Place::Dedicated { func, .. }) => Ok(match func {
-                    Dedicated::Gclk1 => Source::Gclk1,
-                    Dedicated::Gclr => Source::Gclr,
-                    Dedicated::Oe1 => Source::Oe1,
-                    Dedicated::Gclk2Oe2 => Source::Oe2,
-                }),
-                _ => err(FitErrorKind::Other, format!("signal {n} has no pad")),
-            },
-            Signal::Fold(k) => err(FitErrorKind::Other, format!("foldback {k} is not a UIM source")),
-            Signal::Fb(n, _) => match place_of.get(n) {
-                // an always-enabled output's feedback equals its pin: the vendor routes the pad
-                Some(Place::Pin { mc, .. }) if design.cell(n).map_or(false, |c| c.oe.is_none()) => Ok(Source::Pad(*mc)),
-                Some(Place::Pin { mc, .. }) | Some(Place::Node { mc }) => Ok(Source::Fb(*mc)),
-                _ => err(FitErrorKind::Other, format!("signal {n} has no feedback")),
-            },
-        }
-    };
     FOLDS.with(|f| {
         let mut f = f.borrow_mut();
         f.clear();
@@ -1082,7 +1157,7 @@ fn fit_attempt(
                         if pin_of_name(n) == Some(dev.gclr) && !pl.ar_global && gclr_inv.map_or(true, |inv| inv == !pos) =>
                     {
                         pl.ar_global = true;
-                        gclr_inv = Some(!pos);
+                        *gclr_inv = Some(!pos);
                     }
                     _ => rest.push(p.clone()),
                 }
@@ -1181,7 +1256,7 @@ fn fit_attempt(
         plans.push(pl);
     }
     // logic doubling: move the hosted register's D (PT2), reset (PT3) and CE (PT4) into the host
-    for (&ri, &yi) in &host_of {
+    for (&ri, &yi) in host_of.iter() {
         let rp = plans[ri].clone();
         if rp.invert || rp.sum.len() != 1 || rp.constant.is_some() || !matches!(rp.clk, ClkUse::Global(_)) {
             return err(FitErrorKind::Other, format!("{}: cannot share a macrocell with {}", design.cells[ri].name, design.cells[yi].name));
@@ -1224,7 +1299,7 @@ fn fit_attempt(
         if plans[i].helper_pts.is_empty() {
             continue;
         }
-        let mc = mc_of(&place_of, &c.name);
+        let mc = mc_of(place_of, &c.name);
         // a PT-free input register (D from the pad) leaves its macrocell's PTs and sum free
         let shareable = |j: usize| plans[j].fast_in && plans[j].pts.is_empty() && !plans[j].fold_host;
         if (mc - 1) % 16 == 0
@@ -1236,11 +1311,18 @@ fn fit_attempt(
         uses[mc as usize - 1].helper_for = Some(mc);
     }
 
+    Ok(plans)
+}
+
+/// Foldback expanders (spec F4.6a): one macrocell per (foldback, block), hosted on free
+/// macrocells or on logic with a free PT.
+fn host_foldbacks(design: &Design, opts: &Options, placed: &mut Placed, plans: &mut [PtPlan]) -> Result<Folds, FitError> {
+    let Placed { uses, place_of, .. } = placed;
     // ---- foldback expanders: one free macrocell per (product, block), highest first
     let fold_products: BTreeMap<String, Vec<(Signal, bool)>> = FOLDS.with(|f| f.borrow().clone());
     let mut fold_mc: BTreeMap<(String, usize), u16> = BTreeMap::new();
     for (i, c) in design.cells.iter().enumerate() {
-        let b = (mc_of(&place_of, &c.name) as usize - 1) / 16;
+        let b = (mc_of(place_of, &c.name) as usize - 1) / 16;
         let mut folds_needed: Vec<String> = plans[i]
             .pts
             .values()
@@ -1330,6 +1412,15 @@ fn fit_attempt(
     let fold_at: BTreeMap<u16, Vec<(Signal, bool)>> =
         fold_mc.iter().map(|((k, _), &m)| (m, fold_products[k].clone())).collect();
 
+    Ok(Folds { fold_mc, fold_at })
+}
+
+/// UIM routing (spec F4.7): every block's inputs matched onto its 40 multiplexers.
+fn route_uim(dev: &'static Device, design: &Design, placed: &Placed, plans: &[PtPlan], folds: &Folds) -> Result<Routing, FitError> {
+    let f = dev.family;
+    let Placed { uses, place_of, .. } = placed;
+    let Folds { fold_at, .. } = folds;
+    let source_of = |s: &Signal| signal_source(design, place_of, s);
     // ---- UIM routing
     let mut routing: BTreeMap<usize, Vec<(usize, String, String)>> = BTreeMap::new();
     let mut col_of: BTreeMap<(usize, Source), usize> = BTreeMap::new();
@@ -1459,7 +1550,20 @@ fn fit_attempt(
         routing.insert(b, r);
     }
 
-    FOLD_MC.with(|x| *x.borrow_mut() = fold_mc.clone());
+
+    Ok(Routing { routing, col_of, sel_of })
+}
+
+/// Fuse assembly (spec F5): UIM and GOE selections, global configuration, every macrocell.
+#[allow(clippy::too_many_arguments)]
+fn assemble(dev: &'static Device, design: Design, opts: &Options, placed: Placed, nets: &Nets, plans: &[PtPlan], folds: &Folds, routing: Routing) -> Result<FitResult, FitError> {
+    let f = dev.family;
+    let nmc = f.macrocells();
+    let Placed { uses, mut placement, place_of, .. } = placed;
+    let Nets { gclk_net, gclr_inv, goe } = nets;
+    let Folds { fold_mc, fold_at } = folds;
+    let Routing { routing, col_of, sel_of } = routing;
+    let source_of = |s: &Signal| signal_source(&design, &place_of, s);
     // ---- assemble
     let mut fz = Fuses::new(f);
     fz.security = opts.security;
@@ -1538,17 +1642,17 @@ fn fit_attempt(
                     set(pt_mux_bit(k), false);
                 }
                 for (&k, p) in &plans[uses[t as usize].cell.unwrap()].helper_pts {
-                    write_pt(&mut fz, f, m, k, p, b_of(m), &col_of, &source_of)?;
+                    write_pt(&mut fz, f, m, k, p, b_of(m), &col_of, fold_mc, &source_of)?;
                 }
             }
             set(McBit::Slew, !fast);
             set(McBit::OpenDrain, opts.open_collector.contains(&c.name));
             for (&k, p) in &pl.pts {
-                write_pt(&mut fz, f, m, k, p, b_of(m), &col_of, &source_of)?;
+                write_pt(&mut fz, f, m, k, p, b_of(m), &col_of, fold_mc, &source_of)?;
             }
             if let Some(p) = fold_at.get(&(m as u16)) {
                 set(McBit::Pt1Mux, true);
-                write_pt(&mut fz, f, m, 1, p, b_of(m), &col_of, &source_of)?;
+                write_pt(&mut fz, f, m, 1, p, b_of(m), &col_of, fold_mc, &source_of)?;
             }
             if let (Some(h), Some(ri)) = (&pl.hosted, u.hosted) {
                 // vendor encoding of a doubled macrocell (observed in spi / shift-register)
@@ -1580,13 +1684,13 @@ fn fit_attempt(
                 set(pt_mux_bit(k), false);
             }
             for (&k, p) in &pl.helper_pts {
-                write_pt(&mut fz, f, m, k, p, b_of(m), &col_of, &source_of)?;
+                write_pt(&mut fz, f, m, k, p, b_of(m), &col_of, fold_mc, &source_of)?;
             }
         } else if let Some(p) = fold_at.get(&(m as u16)) {
             encode_unused(u.pad_used, &mut set);
             set(McBit::Pt1Mux, true);
             set(McBit::PtPowerOff, false);
-            write_pt(&mut fz, f, m, 1, p, b_of(m), &col_of, &source_of)?;
+            write_pt(&mut fz, f, m, 1, p, b_of(m), &col_of, fold_mc, &source_of)?;
         } else {
             encode_unused(u.pad_used, &mut set);
         }
@@ -2180,7 +2284,6 @@ fn mc_of(place_of: &BTreeMap<String, Place>, n: &str) -> u16 {
 }
 
 thread_local! {
-    static FOLD_MC: std::cell::RefCell<BTreeMap<(String, usize), u16>> = Default::default();
     static FOLDS: std::cell::RefCell<BTreeMap<String, Vec<(Signal, bool)>>> = Default::default();
 }
 
@@ -2305,6 +2408,7 @@ fn write_pt(
     p: &[(Signal, bool)],
     b: usize,
     col_of: &BTreeMap<(usize, Source), usize>,
+    fold_mc: &BTreeMap<(String, usize), u16>,
     source_of: &dyn Fn(&Signal) -> Result<Source, FitError>,
 ) -> Result<(), FitError> {
     let a = f.pt_addr(mc, k);
@@ -2314,7 +2418,7 @@ fn write_pt(
             if !pos {
                 return err(FitErrorKind::Other, format!("internal: inverted foldback literal {k} in a product term"));
             }
-            let Some(m) = FOLD_MC.with(|x| x.borrow().get(&(k.clone(), b)).copied()) else {
+            let Some(&m) = fold_mc.get(&(k.clone(), b)) else {
                 return err(FitErrorKind::Other, format!("internal: MC{mc} reads foldback {k}, which has no expander in block {}", atf15xx_arch::block_letter(b)));
             };
             fz.set(a + f.pt_foldback_column((m as usize - 1) % 16), false);
