@@ -1,0 +1,14 @@
+#$ DEVICE  f1508plcc84
+#$ PINS  7 L+:1 a+:2 b+:84 c+:81 d+:80 Y+:4 Z+:5
+.i 5
+.o 3
+.type f
+.ilb L a b c d
+.ob Y Y.OE Z
+.phase 111
+.p 4
+-1--- 100
+1-1-- 010
+--011 010
+1--11 001
+.e

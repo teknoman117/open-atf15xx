@@ -1,0 +1,1 @@
+-device P1508T100 -preassign keep -JTAG on -power_reset on -created Mon Nov 23 21:56:05 2026

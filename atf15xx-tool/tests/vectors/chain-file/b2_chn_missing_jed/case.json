@@ -1,0 +1,6 @@
+{
+ "name": "b2_chn_missing_jed",
+ "devices": [],
+ "expect": "reject",
+ "reject_class": "E3"
+}

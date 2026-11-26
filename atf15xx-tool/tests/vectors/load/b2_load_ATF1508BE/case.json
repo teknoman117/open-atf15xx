@@ -1,0 +1,11 @@
+{
+ "name": "b2_load_ATF1508BE",
+ "devices": [
+  {
+   "name": "ATF1508BE",
+   "instr": 5,
+   "jed": "a.jed"
+  }
+ ],
+ "expect": "ok"
+}

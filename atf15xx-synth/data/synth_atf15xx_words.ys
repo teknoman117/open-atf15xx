@@ -1,0 +1,27 @@
+# ATF15xx word-level synthesis script (atf15xx-synth --map words, the Yosys plugin's default;
+# spec F9.9). Yosys stops at its coarse cells ($eq, $lt, $add, $reduce_xor, $pmux, $shiftx, ...);
+# atf15xx-synth lowers them itself (atf15xx-synth/src/wordmap.rs), macrocell-aware. Only
+# the cell types it does not lower go through Yosys's techmap (#@TECHMAP@). Flip-flops end as the
+# same legal storage cells as in synth_atf15xx.ys.
+proc
+tribuf
+flatten
+opt_expr
+opt_clean
+check
+opt -nodffe -nosdff
+fsm
+opt
+wreduce
+peepopt
+opt_clean
+opt
+memory -nomap
+opt_clean
+memory_map
+opt -full
+#@TECHMAP@
+simplemap t:$dff t:$dffe t:$adff t:$adffe t:$sdff t:$sdffe t:$sdffce t:$dffsr t:$dffsre t:$aldff t:$aldffe t:$dlatch t:$adlatch t:$dlatchsr t:$sr
+opt -fast
+dfflegalize -cell $_DFF_P_ 01 -cell $_DFFE_PP_ 01 -cell $_DFF_PP0_ 01 -cell $_DFF_PP1_ 01 -cell $_DFFE_PP0P_ 01 -cell $_DFFE_PP1P_ 01 -cell $_DFFSR_PPP_ 01 -cell $_DFFSRE_PPPP_ 01 -cell $_DLATCH_P_ 01 -cell $_DLATCH_PP0_ 01 -cell $_DLATCH_PP1_ 01 -cell $_DLATCHSR_PPP_ 01
+opt_clean -purge

@@ -1,0 +1,11 @@
+{
+ "name": "jf_plain",
+ "devices": [
+  {
+   "name": "ATF1504AS",
+   "instr": 1,
+   "jed": "a.jed"
+  }
+ ],
+ "expect": "ok"
+}

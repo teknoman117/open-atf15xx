@@ -1,0 +1,14 @@
+{
+ "name": "b2_tck1001_erase",
+ "devices": [
+  {
+   "name": "ATF1502AS",
+   "instr": 2,
+   "jed": null
+  }
+ ],
+ "rev": "C",
+ "tck": 1001,
+ "expect": "ok",
+ "compat_tck": true
+}

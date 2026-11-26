@@ -1,0 +1,3913 @@
+{
+ "source": "black box: datasheets 1502: ATF1502AS.txt, ATF1502ASV.txt; 1504: ATF1504AS.txt; 1508: ATF1508AS.txt; vendor-fitter SDF output, corpus (tools/fuzzers/fitter-timing)",
+ "grades": [
+  "-7",
+  "-10",
+  "-15",
+  "-20",
+  "-25"
+ ],
+ "note": "whole ns per grade (-7 -10 -15 -20 -25): datasheet values truncated as the fitters do; values visible in the fitters' SDF output are the fitters' own",
+ "families": {
+  "1502": {
+   "params": {
+    "tACH": {
+     "min": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "max": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tACL": {
+     "min": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "max": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tACNT": {
+     "min": [
+      8,
+      10,
+      13,
+      16,
+      22
+     ],
+     "max": [
+      8,
+      10,
+      13,
+      16,
+      22
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tACOP": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tAH": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tASU": {
+     "min": [
+      3,
+      3,
+      4,
+      4,
+      5
+     ],
+     "max": [
+      3,
+      3,
+      4,
+      4,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCH": {
+     "min": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCL": {
+     "min": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCLR": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      5
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tCNT": {
+     "min": [
+      8,
+      10,
+      13,
+      16,
+      22
+     ],
+     "max": [
+      8,
+      10,
+      13,
+      16,
+      22
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCOMB": {
+     "min": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCOP": {
+     "min": [
+      4,
+      5,
+      8,
+      10,
+      13
+     ],
+     "max": [
+      4,
+      5,
+      8,
+      10,
+      13
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHCX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHGX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHIX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLCV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLGV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLIV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLOV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tEN": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFH": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      5
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFH_global": {
+     "min": [
+      0,
+      0,
+      1,
+      1,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      1,
+      1,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFIN": {
+     "min": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFSU": {
+     "min": [
+      3,
+      3,
+      2,
+      2,
+      3
+     ],
+     "max": [
+      3,
+      3,
+      2,
+      2,
+      3
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFSU_global": {
+     "min": [
+      3,
+      3,
+      3,
+      3,
+      5
+     ],
+     "max": [
+      3,
+      3,
+      3,
+      3,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tGLOB": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tGVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tH": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      5
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tH_global": {
+     "min": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIC": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIN": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIO": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIOE": {
+     "min": [
+      2,
+      2,
+      3,
+      3,
+      4
+     ],
+     "max": [
+      2,
+      2,
+      3,
+      3,
+      4
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tLAC": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tLAD": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tOD1": {
+     "min": [
+      2,
+      1,
+      4,
+      5,
+      7
+     ],
+     "max": [
+      2,
+      1,
+      4,
+      5,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tOD2": {
+     "min": [
+      2,
+      2,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      2,
+      2,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "inferred:1504",
+      "inferred:1504",
+      "inferred:1508",
+      "inferred:1508",
+      "inferred:1504"
+     ]
+    },
+    "tOD3": {
+     "min": [
+      5,
+      5,
+      8,
+      10,
+      10
+     ],
+     "max": [
+      5,
+      5,
+      8,
+      10,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "inferred:1504",
+      "inferred:1504",
+      "inferred:1508",
+      "inferred:1508",
+      "inferred:1504"
+     ]
+    },
+    "tPD1": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tPD2": {
+     "min": [
+      7,
+      9,
+      12,
+      16,
+      25
+     ],
+     "max": [
+      7,
+      9,
+      12,
+      16,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tPEXP": {
+     "min": [
+      0,
+      0,
+      1,
+      1,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      1,
+      1,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tPRE": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      5
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tRD": {
+     "min": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tRPA": {
+     "min": [
+      10,
+      11,
+      13,
+      14,
+      15
+     ],
+     "max": [
+      10,
+      11,
+      13,
+      14,
+      15
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tSEXP": {
+     "min": [
+      4,
+      5,
+      8,
+      10,
+      12
+     ],
+     "max": [
+      4,
+      5,
+      8,
+      10,
+      12
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tSU": {
+     "min": [
+      3,
+      3,
+      4,
+      5,
+      5
+     ],
+     "max": [
+      3,
+      3,
+      4,
+      5,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tSU_global": {
+     "min": [
+      6,
+      7,
+      11,
+      16,
+      20
+     ],
+     "max": [
+      6,
+      7,
+      11,
+      16,
+      20
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tUIM": {
+     "min": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tXZ": {
+     "min": [
+      4,
+      5,
+      6,
+      7,
+      7
+     ],
+     "max": [
+      4,
+      5,
+      6,
+      7,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tZX1": {
+     "min": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "max": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tZX2": {
+     "min": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "max": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tZX3": {
+     "min": [
+      9,
+      9,
+      10,
+      11,
+      12
+     ],
+     "max": [
+      9,
+      9,
+      10,
+      11,
+      12
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    }
+   }
+  },
+  "1504": {
+   "params": {
+    "tACH": {
+     "min": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "max": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tACL": {
+     "min": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "max": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tACNT": {
+     "min": [
+      8,
+      10,
+      13,
+      17,
+      22
+     ],
+     "max": [
+      8,
+      10,
+      13,
+      17,
+      22
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tACOP": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tAH": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tASU": {
+     "min": [
+      3,
+      3,
+      4,
+      4,
+      5
+     ],
+     "max": [
+      3,
+      3,
+      4,
+      4,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tCH": {
+     "min": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tCL": {
+     "min": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tCLR": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tCNT": {
+     "min": [
+      8,
+      10,
+      13,
+      17,
+      22
+     ],
+     "max": [
+      8,
+      10,
+      13,
+      17,
+      22
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tCOMB": {
+     "min": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tCOP": {
+     "min": [
+      4,
+      5,
+      8,
+      10,
+      13
+     ],
+     "max": [
+      4,
+      5,
+      8,
+      10,
+      13
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tCVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHCX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHGX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHIX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLCV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLGV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLIV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLOV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tEN": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tFH": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tFH_global": {
+     "min": [
+      0,
+      0,
+      1,
+      1,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      1,
+      1,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tFIN": {
+     "min": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tFSU": {
+     "min": [
+      3,
+      3,
+      2,
+      2,
+      3
+     ],
+     "max": [
+      3,
+      3,
+      2,
+      2,
+      3
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tFSU_global": {
+     "min": [
+      3,
+      3,
+      3,
+      3,
+      5
+     ],
+     "max": [
+      3,
+      3,
+      3,
+      3,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tGLOB": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tGVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tH": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tH_global": {
+     "min": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tIC": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tIN": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tIO": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tIOE": {
+     "min": [
+      2,
+      2,
+      3,
+      3,
+      4
+     ],
+     "max": [
+      2,
+      2,
+      3,
+      3,
+      4
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tIVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tLAC": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tLAD": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tOD1": {
+     "min": [
+      2,
+      1,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      1,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tOD2": {
+     "min": [
+      2,
+      2,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      2,
+      2,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tOD3": {
+     "min": [
+      5,
+      5,
+      8,
+      10,
+      10
+     ],
+     "max": [
+      5,
+      5,
+      8,
+      10,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tPD1": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tPD2": {
+     "min": [
+      7,
+      9,
+      12,
+      16,
+      25
+     ],
+     "max": [
+      7,
+      9,
+      12,
+      16,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tPEXP": {
+     "min": [
+      0,
+      0,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      0,
+      0,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tPRE": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tRD": {
+     "min": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tRPA": {
+     "min": [
+      10,
+      11,
+      13,
+      14,
+      15
+     ],
+     "max": [
+      10,
+      11,
+      13,
+      14,
+      15
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tSEXP": {
+     "min": [
+      4,
+      5,
+      8,
+      10,
+      12
+     ],
+     "max": [
+      4,
+      5,
+      8,
+      10,
+      12
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tSU": {
+     "min": [
+      3,
+      2,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      3,
+      2,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tSU_global": {
+     "min": [
+      6,
+      7,
+      11,
+      16,
+      20
+     ],
+     "max": [
+      6,
+      7,
+      11,
+      16,
+      20
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tUIM": {
+     "min": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tXZ": {
+     "min": [
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tZX1": {
+     "min": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "max": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tZX2": {
+     "min": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "max": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    },
+    "tZX3": {
+     "min": [
+      9,
+      9,
+      10,
+      11,
+      12
+     ],
+     "max": [
+      9,
+      9,
+      10,
+      11,
+      12
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "inferred:1508",
+      "inferred:1508",
+      "datasheet"
+     ]
+    }
+   }
+  },
+  "1508": {
+   "params": {
+    "tACH": {
+     "min": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "max": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tACL": {
+     "min": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "max": [
+      3,
+      4,
+      6,
+      8,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tACNT": {
+     "min": [
+      8,
+      10,
+      13,
+      17,
+      22
+     ],
+     "max": [
+      8,
+      10,
+      13,
+      17,
+      22
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tACOP": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tAH": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tASU": {
+     "min": [
+      3,
+      3,
+      4,
+      4,
+      5
+     ],
+     "max": [
+      3,
+      3,
+      4,
+      4,
+      5
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCH": {
+     "min": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCL": {
+     "min": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCLR": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tCNT": {
+     "min": [
+      8,
+      10,
+      13,
+      17,
+      22
+     ],
+     "max": [
+      8,
+      10,
+      13,
+      17,
+      22
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCOMB": {
+     "min": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCOP": {
+     "min": [
+      4,
+      5,
+      8,
+      10,
+      13
+     ],
+     "max": [
+      4,
+      5,
+      8,
+      10,
+      13
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tCVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHCX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHGX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDHIX": {
+     "min": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "max": [
+      12,
+      15,
+      25,
+      30,
+      35
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLCV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLGV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLIV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tDLOV": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tEN": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFH": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFH_global": {
+     "min": [
+      0,
+      0,
+      1,
+      1,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      1,
+      1,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFIN": {
+     "min": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFSU": {
+     "min": [
+      3,
+      3,
+      2,
+      2,
+      3
+     ],
+     "max": [
+      3,
+      3,
+      2,
+      2,
+      3
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tFSU_global": {
+     "min": [
+      3,
+      3,
+      3,
+      3,
+      3
+     ],
+     "max": [
+      3,
+      3,
+      3,
+      3,
+      3
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tGLOB": {
+     "min": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tGVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tH": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tH_global": {
+     "min": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIC": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIN": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIO": {
+     "min": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      0,
+      0,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIOE": {
+     "min": [
+      2,
+      2,
+      3,
+      3,
+      4
+     ],
+     "max": [
+      2,
+      2,
+      3,
+      3,
+      4
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tIVDH": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tLAC": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tLAD": {
+     "min": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      3,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tOD1": {
+     "min": [
+      2,
+      1,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      1,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tOD2": {
+     "min": [
+      2,
+      2,
+      5,
+      6,
+      7
+     ],
+     "max": [
+      2,
+      2,
+      5,
+      6,
+      7
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tOD3": {
+     "min": [
+      5,
+      5,
+      8,
+      10,
+      12
+     ],
+     "max": [
+      5,
+      5,
+      8,
+      10,
+      12
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tPD1": {
+     "min": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "max": [
+      7,
+      10,
+      15,
+      20,
+      25
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tPD2": {
+     "min": [
+      7,
+      9,
+      12,
+      16,
+      20
+     ],
+     "max": [
+      7,
+      9,
+      12,
+      16,
+      20
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tPEXP": {
+     "min": [
+      0,
+      0,
+      1,
+      1,
+      1
+     ],
+     "max": [
+      0,
+      0,
+      1,
+      1,
+      1
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tPRE": {
+     "min": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tRD": {
+     "min": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      2,
+      1,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tRPA": {
+     "min": [
+      10,
+      11,
+      13,
+      14,
+      15
+     ],
+     "max": [
+      10,
+      11,
+      13,
+      14,
+      15
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tSEXP": {
+     "min": [
+      4,
+      5,
+      8,
+      10,
+      12
+     ],
+     "max": [
+      4,
+      5,
+      8,
+      10,
+      12
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tSU": {
+     "min": [
+      3,
+      2,
+      4,
+      5,
+      6
+     ],
+     "max": [
+      3,
+      2,
+      4,
+      5,
+      6
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tSU_global": {
+     "min": [
+      6,
+      7,
+      11,
+      16,
+      20
+     ],
+     "max": [
+      6,
+      7,
+      11,
+      16,
+      20
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tUIM": {
+     "min": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "max": [
+      1,
+      1,
+      2,
+      2,
+      2
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tXZ": {
+     "min": [
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "max": [
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unit": "ns",
+     "evidence": [
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf",
+      "sdf"
+     ]
+    },
+    "tZX1": {
+     "min": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "max": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tZX2": {
+     "min": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "max": [
+      4,
+      5,
+      7,
+      9,
+      10
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    },
+    "tZX3": {
+     "min": [
+      9,
+      9,
+      10,
+      11,
+      12
+     ],
+     "max": [
+      9,
+      9,
+      10,
+      11,
+      12
+     ],
+     "unit": "ns",
+     "evidence": [
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet",
+      "datasheet"
+     ]
+    }
+   }
+  }
+ }
+}

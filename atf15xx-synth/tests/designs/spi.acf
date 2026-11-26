@@ -1,0 +1,6 @@
+# Same fitter options as the user's compile.bash (JTAG pins 7 and 13 are used as I/O)
+device ATF1504AS-PLCC44
+option jtag off
+option pin_keep off
+option output_fast on
+option logic_doubling on

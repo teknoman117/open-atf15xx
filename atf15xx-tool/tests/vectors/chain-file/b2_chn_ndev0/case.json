@@ -1,0 +1,6 @@
+{
+ "name": "b2_chn_ndev0",
+ "devices": [],
+ "expect": "reject",
+ "reject_class": "E2"
+}

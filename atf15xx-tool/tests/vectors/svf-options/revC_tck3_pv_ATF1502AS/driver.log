@@ -1,0 +1,9 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\revC_tck3_pv_ATF1502AS\out.svf' chk=1 rev=0 sr=1
+DONE: how=2 ms=5344 size=79027
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: erasing device #1.
+LOG:           log: programming device #1.
+LOG:           log: verifying device #1: ... OK ...
+LOG:           log: JTAG instructions finished successfully.

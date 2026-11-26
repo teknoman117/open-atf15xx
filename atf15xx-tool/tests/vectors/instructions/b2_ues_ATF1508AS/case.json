@@ -1,0 +1,11 @@
+{
+ "name": "b2_ues_ATF1508AS",
+ "devices": [
+  {
+   "name": "ATF1508AS",
+   "instr": 9,
+   "jed": null
+  }
+ ],
+ "expect": "ok"
+}

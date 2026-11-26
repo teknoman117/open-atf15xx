@@ -1,0 +1,8 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\b2_load_ATF1508BE\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5632 size=140851
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           warning: Device #1 is secured, output jedec is blank.
+LOG:           log: reading device #1.
+LOG:           log: JTAG instructions failed.

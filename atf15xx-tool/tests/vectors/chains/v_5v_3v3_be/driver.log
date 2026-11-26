@@ -1,0 +1,9 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\v_5v_3v3_be\out.svf' chk=1 rev=1 sr=1
+MSGBOX: Cannot program ATF15xxBE with other device types! 
+DONE: how=2 ms=4657 size=-1
+LOG:           ...  Calibration constant set to 1
+LOG:           ...  USB cable not detected. Please check the hardware and try again.
+LOG:           ...  USB cable not detected. Please check the hardware and try again.
+LOG:           ...  USB cable not detected. Please check the hardware and try again.

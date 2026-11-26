@@ -1,0 +1,6 @@
+MSGBOX: Invalid Chain file. The number of devices in Chain file must be between 1 and 50. 
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\b2_chn_ndev0\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5450 size=457
+LOG:           log: JTAG instructions finished successfully.

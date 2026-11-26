@@ -1,0 +1,22 @@
+{
+ "name": "chain_unk_noid_blank",
+ "devices": [
+  {
+   "name": "ATF1504AS",
+   "instr": 3
+  },
+  {
+   "name": "UNKNOWN",
+   "width": 5,
+   "idcode": false,
+   "instr": 0
+  },
+  {
+   "name": "UNKNOWN",
+   "width": 12,
+   "idcode": true,
+   "instr": 0
+  }
+ ],
+ "expect": "ok"
+}

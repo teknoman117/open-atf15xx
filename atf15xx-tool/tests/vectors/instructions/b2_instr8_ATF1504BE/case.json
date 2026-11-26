@@ -1,0 +1,11 @@
+{
+ "name": "b2_instr8_ATF1504BE",
+ "devices": [
+  {
+   "name": "ATF1504BE",
+   "instr": 8,
+   "jed": null
+  }
+ ],
+ "expect": "ok"
+}

@@ -1,0 +1,13 @@
+{
+ "name": "jed_digit2_and_X",
+ "devices": [
+  {
+   "name": "ATF1502AS",
+   "instr": 4,
+   "jed": "a.jed"
+  }
+ ],
+ "expect": "reject",
+ "reject_class": "J2",
+ "note": "ATMISP output for this input is undefined (field >= 200 bytes overflows a stack buffer); expected.svf.gz records what one run produced"
+}

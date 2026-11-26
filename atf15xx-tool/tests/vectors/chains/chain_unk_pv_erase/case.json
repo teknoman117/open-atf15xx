@@ -1,0 +1,21 @@
+{
+ "name": "chain_unk_pv_erase",
+ "devices": [
+  {
+   "name": "UNKNOWN",
+   "width": 8,
+   "idcode": true,
+   "instr": 0
+  },
+  {
+   "name": "ATF1502AS",
+   "instr": 1,
+   "jed": "b.jed"
+  },
+  {
+   "name": "ATF1504AS",
+   "instr": 2
+  }
+ ],
+ "expect": "ok"
+}

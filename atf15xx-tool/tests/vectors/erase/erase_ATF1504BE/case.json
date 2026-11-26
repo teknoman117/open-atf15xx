@@ -1,0 +1,11 @@
+{
+ "name": "erase_ATF1504BE",
+ "devices": [
+  {
+   "name": "ATF1504BE",
+   "instr": 2,
+   "jed": null
+  }
+ ],
+ "expect": "ok"
+}

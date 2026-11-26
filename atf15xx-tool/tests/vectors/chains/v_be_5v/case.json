@@ -1,0 +1,17 @@
+{
+ "name": "v_be_5v",
+ "devices": [
+  {
+   "name": "ATF1504BE",
+   "instr": 2,
+   "jed": null
+  },
+  {
+   "name": "ATF1504AS",
+   "instr": 2,
+   "jed": null
+  }
+ ],
+ "expect": "reject",
+ "reject_class": "V1"
+}

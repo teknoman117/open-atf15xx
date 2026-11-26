@@ -1,0 +1,20 @@
+[package]
+name = "atf15xx-fit"
+version.workspace = true
+edition.workspace = true
+description = "Fitter core for ATF150xAS CPLDs: SOP netlist IR, .tt2 front end, placement, UIM routing, fuse assembly, JEDEC writer and reader"
+license.workspace = true
+
+[dependencies]
+rustc-hash = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+atf15xx-arch = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+espresso-logic = { workspace = true }
+petgraph = { workspace = true }

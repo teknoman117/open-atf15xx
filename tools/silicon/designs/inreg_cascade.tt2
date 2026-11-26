@@ -1,0 +1,26 @@
+#$ DEVICE  f1508plcc84
+#$ PINS  7 ck+:2 d+:80 e+:81 a+:84 b+:1 Y+:4 Z+:5
+#$ NODES 2 F+:727 r+
+# Packing P2+ silicon test: r is a fast input register in P80's macrocell (MC126, D from the pad,
+# clocked by GCLK2); the same macrocell lends its whole sum by cascade to F (MC127), a 4-input
+# parity needing 8 PTs. Y = F on P4, Z = r on P5.
+.i 7
+.o 5
+.type f
+.ilb ck d e a b F r.Q
+.ob F r.D r.C Y Z
+.phase 11111
+.p 12
+--100-0 10000
+--010-0 10000
+--001-0 10000
+--111-0 10000
+--000-1 10000
+--110-1 10000
+--101-1 10000
+--011-1 10000
+-1----- 01000
+1------ 00100
+-----1- 00010
+------1 00001
+.e

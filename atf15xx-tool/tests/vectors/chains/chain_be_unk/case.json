@@ -1,0 +1,16 @@
+{
+ "name": "chain_be_unk",
+ "devices": [
+  {
+   "name": "UNKNOWN",
+   "width": 10,
+   "idcode": true,
+   "instr": 0
+  },
+  {
+   "name": "ATF1504BE",
+   "instr": 2
+  }
+ ],
+ "expect": "ok"
+}

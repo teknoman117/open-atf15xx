@@ -1,0 +1,1 @@
+-device P1508T100 -preassign keep -JTAG on -pin_keep on -created Mon Nov 23 21:56:04 2026

@@ -1,0 +1,14 @@
+{
+ "name": "b2_revC_tck1_erase_ATF1504BE_nosr",
+ "devices": [
+  {
+   "name": "ATF1504BE",
+   "instr": 2,
+   "jed": null
+  }
+ ],
+ "rev": "C",
+ "tck": 1,
+ "state_reset": 0,
+ "expect": "ok"
+}

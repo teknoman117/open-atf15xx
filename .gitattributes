@@ -1,0 +1,10 @@
+# Byte-exact data: never normalise line endings (several files contain CR LF on purpose)
+*.jedt -text
+*.gz binary
+atf15xx-tool/tests/vectors/** -text
+atf15xx-arch/tests/** -text
+atf15xx-tool/tests/** -text
+atf15xx-fit/tests/** -text
+atf15xx-synth/tests/** -text
+atf15xx-sim/tests/** -text
+docs/architecture/data/** -text

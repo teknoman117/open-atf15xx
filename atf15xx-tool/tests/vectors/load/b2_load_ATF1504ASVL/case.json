@@ -1,0 +1,11 @@
+{
+ "name": "b2_load_ATF1504ASVL",
+ "devices": [
+  {
+   "name": "ATF1504ASVL",
+   "instr": 5,
+   "jed": "a.jed"
+  }
+ ],
+ "expect": "ok"
+}

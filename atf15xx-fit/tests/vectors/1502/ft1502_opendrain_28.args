@@ -1,0 +1,1 @@
+-device P1502C44 -preassign keep -JTAG on -open_collector Y -created Mon Nov 23 21:52:52 2026

@@ -1,0 +1,13 @@
+# Yosys script: Verilog -> sum-of-products + ATF15xx-legal storage cells (JSON).
+# Run with: yosys -p "read_verilog design.v; hierarchy -top top; script synth_atf15xx.ys"
+proc
+tribuf
+synth -flatten -run coarse
+synth -flatten -run fine:
+# macrocell storage: D flip-flop (+ clock enable, + async reset or set) or transparent latch
+dfflegalize -cell $_DFF_P_ x -cell $_DFFE_PP_ x -cell $_DFF_PP0_ x -cell $_DFF_PP1_ x -cell $_DFFE_PP0P_ x -cell $_DFFE_PP1P_ x -cell $_DLATCH_P_ x
+# two-level logic; generous limits, the fitter splits/cascades product terms itself
+abc -sop -I 40 -P 80
+opt_clean -purge
+stat
+write_json -compat-int out.json

@@ -1,0 +1,9 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\chain_be_unk\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5338 size=70187
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: erasing device #2.
+LOG:           log: bypass device #1.
+LOG:           log: blank check device #2: ... OK ...device is blank.
+LOG:           log: JTAG instructions finished successfully.

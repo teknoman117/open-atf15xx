@@ -1,0 +1,11 @@
+{
+ "name": "erase_ATF1502ASL",
+ "devices": [
+  {
+   "name": "ATF1502ASL",
+   "instr": 2,
+   "jed": null
+  }
+ ],
+ "expect": "ok"
+}

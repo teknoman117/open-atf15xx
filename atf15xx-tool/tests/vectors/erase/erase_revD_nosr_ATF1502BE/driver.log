@@ -1,0 +1,8 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\erase_revD_nosr_ATF1502BE\out.svf' chk=1 rev=1 sr=0
+DONE: how=2 ms=5348 size=33285
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: erasing device #1.
+LOG:           log: blank check device #1: ... OK ...device is blank.
+LOG:           log: JTAG instructions finished successfully.

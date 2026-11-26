@@ -1,0 +1,9 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\b2_instr6_ATF1504BE\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5353 size=1371
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: securing device #1.
+LOG:           log: verifying if device #1 secured:
+LOG:           log: warning: SVF generation procedure cannot be used with Secure procedure together.  This is the software limitation.
+LOG:           log: JTAG instructions finished successfully.

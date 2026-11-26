@@ -1,0 +1,19 @@
+{
+ "name": "chain_3x_erase_nosr",
+ "state_reset": 0,
+ "devices": [
+  {
+   "name": "ATF1508AS",
+   "instr": 2
+  },
+  {
+   "name": "ATF1504ASV",
+   "instr": 2
+  },
+  {
+   "name": "ATF1502ASL",
+   "instr": 3
+  }
+ ],
+ "expect": "ok"
+}

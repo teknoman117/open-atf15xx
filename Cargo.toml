@@ -1,0 +1,51 @@
+# open-atf150x: an open toolchain for Microchip (Atmel) ATF1502AS/1504AS/1508AS CPLDs.
+# Virtual workspace: every crate is a top-level directory (see README.md for the map).
+[workspace]
+members = [
+    "atf15xx-arch",
+    "atf15xx-fit",
+    "atf15xx-synth",
+    "atf15xx-sim",
+    "atf15xx-tool",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "ISC"
+
+[workspace.dependencies]
+# workspace crates
+atf15xx-arch = { path = "atf15xx-arch", version = "0.1.0" }
+atf15xx-fit = { path = "atf15xx-fit", version = "0.1.0" }
+atf15xx-sim = { path = "atf15xx-sim", version = "0.1.0" }
+# without default features: SVF generation only (the boundary-scan debugger is the `jtag` feature)
+atf15xx-tool = { path = "atf15xx-tool", version = "0.1.0", default-features = false }
+# external
+anyhow = "1.0"
+# boundary-scan description of the parts (atf15xx-tool)
+bsdl = "0.1.1"
+# waveform output of in-circuit captures (atf15xx-tool)
+vcd = "0.7"
+# BDDs for exact Boolean analysis where SOP flattening explodes (toggle recovery through carry networks)
+biodivine-lib-bdd = "0.6"
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+clap = { version = "4.6", features = ["derive"] }
+flate2 = "1.1.11"
+# oracles in tests: Berkeley Espresso (logic.rs covers), petgraph matching (UIM matcher)
+espresso-logic = "5.6"
+petgraph = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.154"
+# seeded, reproducible randomness (placement restarts, local search): ChaCha8 has a stable output
+# across versions, unlike rand's StdRng
+rand = "0.9"
+# strategies fitted in parallel (spec F9.11)
+rayon = "1.10"
+# memoised covers (spec F9.11)
+rustc-hash = "2.1"
+rand_chacha = "0.9"
+
+[profile.release]
+opt-level = 3

@@ -1,0 +1,7 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\b2_instr3_ATF1508RE\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5642 size=140851
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: blank check device #1: ... failed blank check since device is secured ...
+LOG:           log: JTAG instructions failed.

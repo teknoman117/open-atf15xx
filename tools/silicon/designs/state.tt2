@@ -1,0 +1,15 @@
+#$ DEVICE  f1508plcc84
+#$ PINS  5 CK+:81 R+:80 S+:1 A+:4 B+:5
+.i 3
+.o 4
+.type f
+.ilb CK R S
+.ob A.D A.C B.D B.C
+.phase 1111
+.p 5
+-1- 1000
+1-- 0100
+-1- 0010
+--1 0010
+1-- 0001
+.e

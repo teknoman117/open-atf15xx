@@ -1,0 +1,12 @@
+{
+ "name": "erase_ATF1502SEL",
+ "devices": [
+  {
+   "name": "ATF1502SEL",
+   "instr": 2,
+   "jed": null
+  }
+ ],
+ "expect": "reject",
+ "reject_class": "N1"
+}

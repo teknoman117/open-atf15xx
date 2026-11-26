@@ -1,0 +1,1 @@
+-device P1508T100 -preassign keep -JTAG on -GCK_ITD off -created Mon Nov 23 21:56:06 2026

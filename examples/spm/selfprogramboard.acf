@@ -1,0 +1,6 @@
+# Same settings as compile.bash / the .pld PROPERTY lines of SELFPROGRAMBOARD
+device ATF1504AS-PLCC44
+jtag off            # the JTAG pins are used as I/O (D4 on 7, CODE_CS on 13, SPI_IN on 32, A12 on 38)
+bus_keeper off
+security on
+option output_fast on

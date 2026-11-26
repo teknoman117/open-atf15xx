@@ -1,0 +1,32 @@
+[package]
+name = "atf15xx-tool"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "ATF15xx CPLD programming files (the SVF/JEDEC conversions of Microchip ATMISP 7.3) and in-circuit debugging over JTAG boundary scan"
+
+[lib]
+name = "atf15xx_tool"
+
+[[bin]]
+name = "atf15xx-tool"
+path = "src/main.rs"
+required-features = ["jtag"]
+
+[features]
+default = ["jtag"]
+# in-circuit debugging (the `dbg` module and the boundary-scan commands)
+jtag = ["dep:anyhow", "dep:atf15xx-arch", "dep:serde", "dep:serde_json", "dep:vcd"]
+
+[dependencies]
+chrono = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true, optional = true }
+atf15xx-arch = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+vcd = { workspace = true, optional = true }
+
+[dev-dependencies]
+flate2 = { workspace = true }
+serde_json = { workspace = true }

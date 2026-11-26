@@ -1,0 +1,12 @@
+# build output and scratch work (see docs/worklog/README.md)
+/target/
+/.scratch/
+/verify-work/
+__pycache__/
+*.pyc
+*.tmp[0-9]*
+# upstream checkouts (prjbureau is a submodule; our branches live on the user's fork, see docs/prjbureau/branches.md)
+/external/*
+!/external/prjbureau
+# git worktrees of this repository and of submodules (see tools/fuzzers/prjbureau/CLAUDE.md)
+/.worktrees/

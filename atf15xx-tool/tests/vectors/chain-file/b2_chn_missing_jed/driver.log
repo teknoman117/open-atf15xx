@@ -1,0 +1,7 @@
+MSGBOX: Invalid Chain file. JEDEC file specified in Chain file for device # 1 does not exist. 
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\b2_chn_missing_jed\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5353 size=457
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: JTAG instructions finished successfully.

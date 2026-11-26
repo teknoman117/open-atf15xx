@@ -1,0 +1,12 @@
+{
+ "name": "b2_jed_wrongqf",
+ "devices": [
+  {
+   "name": "ATF1502AS",
+   "instr": 1,
+   "jed": "a.jed"
+  }
+ ],
+ "expect": "reject",
+ "reject_class": "J1"
+}

@@ -1,0 +1,9 @@
+MSGBOX: Calibration constant in Chain file is invalid. Setting Calibration constant to 1. 
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\b2_chn_calib0\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5361 size=39250
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: erasing device #1.
+LOG:           log: blank check device #1: ... OK ...device is blank.
+LOG:           log: JTAG instructions finished successfully.

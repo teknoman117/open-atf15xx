@@ -1,0 +1,12 @@
+{
+ "name": "erase_revD_nosr_ATF1508ASL",
+ "rev": "D",
+ "state_reset": 0,
+ "devices": [
+  {
+   "name": "ATF1508ASL",
+   "instr": 2
+  }
+ ],
+ "expect": "ok"
+}

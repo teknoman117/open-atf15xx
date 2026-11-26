@@ -1,0 +1,15 @@
+{
+ "name": "chain_byp_verify",
+ "devices": [
+  {
+   "name": "ATF1502AS",
+   "instr": 0
+  },
+  {
+   "name": "ATF1504AS",
+   "instr": 4,
+   "jed": "c.jed"
+  }
+ ],
+ "expect": "ok"
+}

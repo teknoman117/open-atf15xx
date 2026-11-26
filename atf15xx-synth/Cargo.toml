@@ -1,0 +1,48 @@
+[package]
+name = "atf15xx-synth"
+version.workspace = true
+edition.workspace = true
+description = "Open Verilog → ATF15xx synthesis: Yosys JSON front end, constraints, a driver producing .jed and .svf, and (feature `yosys`) the Yosys plugin `synth_atf15xx`"
+license.workspace = true
+build = "build.rs"
+default-run = "atf15xx-synth"
+
+[lib]
+name = "atf15xx_synth"
+path = "src/lib.rs"
+
+[[bin]]
+name = "atf15xx-synth"
+path = "src/main.rs"
+
+# Exact lower bound for the fitter's block assignment (spec F4.6c); builds HiGHS, so opt-in:
+#   cargo run --release -p atf15xx-synth --features ilp --bin fit-partition-bound -- partition ...
+[[bin]]
+name = "fit-partition-bound"
+path = "src/bin/fit-partition-bound.rs"
+required-features = ["ilp"]
+
+[features]
+ilp = ["dep:good_lp"]
+# The Yosys plugin core (spec F9.7): the `synth_atf15xx` pass and the cxx bridge to RTLIL. Needs
+# the Yosys headers, so it is built inside the Yosys image by tools/yosys-plugin/build.sh
+# (`cargo rustc -p atf15xx-synth --features yosys --lib --crate-type staticlib`).
+yosys = ["dep:cxx", "dep:cxx-build"]
+
+[dependencies]
+rand = { workspace = true }
+rayon = { workspace = true }
+biodivine-lib-bdd = { workspace = true }
+rand_chacha = { workspace = true }
+atf15xx-arch = { workspace = true }
+atf15xx-fit = { workspace = true }
+atf15xx-sim = { workspace = true }
+atf15xx-tool = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+good_lp = { version = "1.15", default-features = false, features = ["highs"], optional = true }
+cxx = { version = "1.0", optional = true }
+
+[build-dependencies]
+cxx-build = { version = "1.0", optional = true }

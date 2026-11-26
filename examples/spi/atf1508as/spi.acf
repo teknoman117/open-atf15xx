@@ -1,0 +1,5 @@
+# Bench build: JTAG stays enabled (the session drives the bus over it), bus keepers hold the
+# JTAG-only bus pins when no session runs.
+device ATF1508AS-PLCC84
+option jtag on
+option pin_keep on

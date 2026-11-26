@@ -1,0 +1,11 @@
+{
+ "name": "pv_ATF1504BE",
+ "devices": [
+  {
+   "name": "ATF1504BE",
+   "instr": 1,
+   "jed": "a.jed"
+  }
+ ],
+ "expect": "ok"
+}

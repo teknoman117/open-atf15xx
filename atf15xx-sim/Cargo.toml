@@ -1,0 +1,21 @@
+[package]
+name = "atf15xx-sim"
+version.workspace = true
+edition.workspace = true
+description = "Functional model, cycle simulator and Verilog emitter for ATF150xAS JEDEC fuse maps"
+license.workspace = true
+
+[lib]
+name = "atf15xx_sim"
+path = "src/lib.rs"
+
+[[bin]]
+name = "atf15xx-sim"
+path = "src/main.rs"
+
+[dependencies]
+atf15xx-arch = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }

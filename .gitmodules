@@ -1,0 +1,4 @@
+[submodule "external/prjbureau"]
+	path = external/prjbureau
+	url = git@github.com:teknoman117/prjbureau.git
+	branch = atf1508as

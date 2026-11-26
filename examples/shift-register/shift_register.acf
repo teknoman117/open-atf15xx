@@ -1,0 +1,9 @@
+# The original build's options (build-hdl.bash): JTAG off, because four of the 64 outputs are the
+# JTAG pins (14 TDI, 23 TMS, 62 TCK, 71 TDO). Programming this image disables JTAG: recovering the
+# chip then needs 12 V on OE1 (the breakout's JP2 in position 2-3). tools/silicon/program.sh
+# refuses it.
+device ATF1508AS-PLCC84
+jtag off
+bus_keeper off
+fast OUT[63:0]
+option logic_doubling on

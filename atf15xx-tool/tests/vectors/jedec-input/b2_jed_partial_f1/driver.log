@@ -1,0 +1,9 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\b2_jed_partial_f1\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5354 size=81846
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: erasing device #1.
+LOG:           log: programming device #1.
+LOG:           log: verifying device #1: ... OK ...
+LOG:           log: JTAG instructions finished successfully.

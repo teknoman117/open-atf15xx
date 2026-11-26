@@ -1,0 +1,11 @@
+{
+ "name": "jed_cr_in_addr",
+ "devices": [
+  {
+   "name": "ATF1502AS",
+   "instr": 4,
+   "jed": "a.jed"
+  }
+ ],
+ "expect": "ok"
+}

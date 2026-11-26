@@ -1,0 +1,11 @@
+[package]
+name = "atf15xx-arch"
+version.workspace = true
+edition.workspace = true
+description = "Architecture and fuse-map database for the Atmel/Microchip ATF1502AS, ATF1504AS and ATF1508AS CPLDs (generated at build time from prjbureau and our black-box data)"
+license.workspace = true
+build = "build/main.rs"
+
+[build-dependencies]
+serde_json = { workspace = true }
+bsdl = { workspace = true }

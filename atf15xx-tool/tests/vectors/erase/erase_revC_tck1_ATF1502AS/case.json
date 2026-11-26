@@ -1,0 +1,12 @@
+{
+ "name": "erase_revC_tck1_ATF1502AS",
+ "rev": "C",
+ "tck": 1,
+ "devices": [
+  {
+   "name": "ATF1502AS",
+   "instr": 2
+  }
+ ],
+ "expect": "ok"
+}

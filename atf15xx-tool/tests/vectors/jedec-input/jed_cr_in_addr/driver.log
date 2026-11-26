@@ -1,0 +1,7 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\jed_cr_in_addr\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5643 size=45589
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: verifying device #1: ... OK ...
+LOG:           log: JTAG instructions finished successfully.

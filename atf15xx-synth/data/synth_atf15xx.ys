@@ -1,0 +1,19 @@
+# ATF15xx synthesis script for the open flow (atf15xx-synth), derived from
+# tools/sim/synth_atf15xx.ys. Run after read_verilog + hierarchy.
+# Result: fine-grained gates ($_AND_, $_OR_, $_XOR_, $_MUX_, $_NOT_, ...), legal macrocell storage
+# cells and $_TBUF_ tri-state drivers. atf15xx-synth turns the gates into sum-of-products covers
+# itself (opt::collapse_limited etc.), so the RTL structure (shared enables, loads, resets) is
+# kept where duplicating it would cost macrocells.
+proc
+tribuf
+synth -flatten -noabc -run coarse
+synth -flatten -noabc -run fine:
+# macrocell storage: D flip-flop (+ clock enable) with async reset and/or set, or a transparent
+# latch with async reset and/or set. Negative clocks/enables/resets become inverted literals.
+# Initial values pass through (`01`) and are checked by atf15xx-synth (--init); with --init invert
+# the flow replaces `01` by `0`, so Yosys inverts registers with an initial value of 1.
+dfflegalize -cell $_DFF_P_ 01 -cell $_DFFE_PP_ 01 -cell $_DFF_PP0_ 01 -cell $_DFF_PP1_ 01 -cell $_DFFE_PP0P_ 01 -cell $_DFFE_PP1P_ 01 -cell $_DFFSR_PPP_ 01 -cell $_DFFSRE_PPPP_ 01 -cell $_DLATCH_P_ 01 -cell $_DLATCH_PP0_ 01 -cell $_DLATCH_PP1_ 01 -cell $_DLATCHSR_PPP_ 01
+# logic mapping (atf15xx-synth --map): none = the gates above (default);
+# abc-gates = abc -g AND,NAND,OR,NOR,XOR,XNOR,ANDNOT,ORNOT,MUX; abc-sop = abc -sop -I 40 -P 80 (Yosys <= 0.68)
+#@MAP@
+opt_clean -purge

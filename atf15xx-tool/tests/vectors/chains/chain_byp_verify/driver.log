@@ -1,0 +1,8 @@
+COMBO[0]='R'
+COMBO[1]='R'
+STATE: svf='C:\probe\cases\chain_byp_verify\out.svf' chk=1 rev=1 sr=1
+DONE: how=2 ms=5340 size=60773
+LOG:           ...  executing JTAG instructions...please wait... 
+LOG:           log: bypass device #1.
+LOG:           log: verifying device #2: ... OK ...
+LOG:           log: JTAG instructions finished successfully.

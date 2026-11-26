@@ -1,0 +1,12 @@
+{
+ "name": "erase_revD_nosr_ATF1504ASV",
+ "rev": "D",
+ "state_reset": 0,
+ "devices": [
+  {
+   "name": "ATF1504ASV",
+   "instr": 2
+  }
+ ],
+ "expect": "ok"
+}
