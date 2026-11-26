@@ -711,8 +711,7 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
                     eprintln!("strategy {si}: {e} ({n_cells} cells)");
                 }
                 // the fitter says why: out of macrocells, pins or PTs -> cell-reducing strategies next
-                let msg = e.to_string();
-                if !capacity_queued && ["no free macrocell", "no free output pin", "do not fit"].iter().any(|k| msg.contains(k)) {
+                if !capacity_queued && e.kind() == atf15xx_fit::fit::FitErrorKind::Capacity {
                     capacity_queued = true;
                     for c in capacity.iter().rev() {
                         queue.push_front(*c);

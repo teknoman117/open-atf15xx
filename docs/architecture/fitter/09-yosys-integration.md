@@ -302,8 +302,10 @@ the container.
 
 **Fitter primitives as a library: not needed yet.** The integration so far calls the whole
 `fit_design`; nothing in the plugin needed a finer fitter API. Two changes would make one
-worthwhile, in this order: (1) typed fit errors (`FitError` kinds via `thiserror`) instead of
-the string matching the strategy loop now uses; (2) cost queries for mapping decisions (block
+worthwhile, in this order: (1) typed fit errors instead of the string matching the strategy
+loop used (**done 2026-11-26**: `FitError { kind, msg }`, the kind set where the error is raised:
+`Capacity`, `InputPins`, `Routing`, `Cascade`, `Netlist`, `Other`; `is_capacity()` covers the first
+two; the flow queues its capacity strategies on `Capacity`; corpus and examples byte-identical); (2) cost queries for mapping decisions (block
 fan-in of a candidate cell set: `uim_unmatched`; PT demand of a cover: `pt_demand`) exposed from
 `atf15xx-fit`, once a mapper wants placement-aware choices. `atf15xx-fit` is already a library
 crate, so this is an API, not a new crate.

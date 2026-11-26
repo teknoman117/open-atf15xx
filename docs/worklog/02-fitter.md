@@ -107,6 +107,12 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — Typed fit errors (F9.9 item 1, prerequisite of the mapping–placement loop):
+  `FitError` carries a `FitErrorKind` set at each of the 28 raise sites instead of being
+  classified from its text afterwards; "no free input pin" is its own kind `InputPins` (counted as
+  capacity by `is_capacity()`, as before), so the flow's capacity trigger is exactly `Capacity`
+  (the same three messages it matched). Check: workspace tests 46/46 (95 vendor-identity vectors
+  included); 34 corpus JEDs and the 4 examples byte-identical (`.scratch/build_all.sh`).
 - **2026-11-25**: New binary `atf15xx-fit` (user request): `-d` takes a part, ordering code, fitter or
   CUPL name and selects the family; typed flags for the common settings, `--set KEY=VALUE` for every
   vendor strategy (later wins), `-o` for the output stem; `fit150x` keep the vendor command line. JED

@@ -119,11 +119,16 @@ impl Default for Options {
 }
 
 #[derive(Debug)]
-pub struct FitError(pub String);
+pub struct FitError {
+    /// What the failure is about, set where it is raised (spec F9.11).
+    pub kind: FitErrorKind,
+    /// The message for the user.
+    pub msg: String,
+}
 
 impl std::fmt::Display for FitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
+        f.write_str(&self.msg)
     }
 }
 impl std::error::Error for FitError {}
@@ -135,6 +140,8 @@ pub enum FitErrorKind {
     /// Out of macrocells, output pins, foldback hosts or product terms: only fewer cells
     /// (packing, logic doubling, other netlist transforms) can help, not another placement.
     Capacity,
+    /// Out of input pins (more pins than the package has): no placement or packing helps.
+    InputPins,
     /// A block's UIM inputs could not be matched onto its 40 multiplexers.
     Routing,
     /// A wide cell's cascade neighbour is taken.
@@ -145,24 +152,21 @@ pub enum FitErrorKind {
 }
 
 impl FitError {
+    pub fn new(kind: FitErrorKind, msg: impl Into<String>) -> FitError {
+        FitError { kind, msg: msg.into() }
+    }
     pub fn kind(&self) -> FitErrorKind {
-        let m = self.0.as_str();
-        if m.contains("routing failed") {
-            FitErrorKind::Routing
-        } else if m.contains("needs cascade from") {
-            FitErrorKind::Cascade
-        } else if m.contains("no free") || m.contains("do not fit") {
-            FitErrorKind::Capacity
-        } else if m.contains("distinct signals") || m.contains("needs an inverted foldback") {
-            FitErrorKind::Netlist
-        } else {
-            FitErrorKind::Other
-        }
+        self.kind
+    }
+    /// Capacity of any kind (macrocells, pins, product terms): another placement of the same
+    /// cells cannot help.
+    pub fn is_capacity(&self) -> bool {
+        matches!(self.kind, FitErrorKind::Capacity | FitErrorKind::InputPins)
     }
 }
 
-fn err<T>(m: impl Into<String>) -> Result<T, FitError> {
-    Err(FitError(m.into()))
+fn err<T>(kind: FitErrorKind, m: impl Into<String>) -> Result<T, FitError> {
+    Err(FitError::new(kind, m))
 }
 
 /// Where a signal ended up.
@@ -285,11 +289,11 @@ enum OeUse {
 
 pub fn fit(family: Family, pla: &Pla, opts: &Options) -> Result<FitResult, FitError> {
     let dev_name = opts.device.clone().unwrap_or_else(|| pla.device.clone());
-    let dev = Device::by_name(&dev_name).ok_or_else(|| FitError(format!("unknown device {dev_name}")))?;
+    let dev = Device::by_name(&dev_name).ok_or_else(|| FitError::new(FitErrorKind::Other, format!("unknown device {dev_name}")))?;
     if dev.family != family {
-        return err(format!("device {} is not an ATF{}AS", dev.name, family.number()));
+        return err(FitErrorKind::Other, format!("device {} is not an ATF{}AS", dev.name, family.number()));
     }
-    let mut design = Design::from_pla(pla).map_err(FitError)?;
+    let mut design = Design::from_pla(pla).map_err(|m| FitError::new(FitErrorKind::Other, m))?;
     design.collapse_comb_nodes();
     design.absorb_output_registers();
     design.legalize_special_functions_with(opts.special_foldback);
@@ -305,7 +309,7 @@ pub fn check_support(design: &Design) -> Result<(), FitError> {
     for c in &design.cells {
         let n = c.inputs().iter().filter(|s| !matches!(s, Signal::Fold(_))).count();
         if n > UIM_INPUTS_PER_BLOCK {
-            return Err(FitError(format!(
+            return Err(FitError::new(FitErrorKind::Netlist, format!(
                 "{}: its functions depend on {n} distinct signals, but a macrocell's product terms see at most the {UIM_INPUTS_PER_BLOCK} UIM inputs of its block (split the logic into buried nodes)",
                 c.name
             )));
@@ -328,7 +332,7 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
         let hosts = design.cells.iter().filter(|c| c.is_output && c.storage == Storage::Comb).count();
         let need = design.cells.len().saturating_sub(regs.min(hosts));
         if need > nmc {
-            return err(format!(
+            return err(FitErrorKind::Capacity, format!(
                 "no free macrocell: {} cells need at least {need} macrocells (at most {} pairs can share one), the device has {nmc}",
                 design.cells.len(),
                 regs.min(hosts)
@@ -357,21 +361,21 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
             // then the partitioner (with the UIM position search), only if the greedy placement
             // failed: keeps the vendor's placements byte-identical
             let mut attempt = fit_attempt(dev, design.clone(), opts, limit, extra, &avoid, Placer::Greedy);
-            if matches!(&attempt, Err(e) if matches!(e.kind(), FitErrorKind::Routing | FitErrorKind::Capacity)) {
+            if matches!(&attempt, Err(e) if e.kind() == FitErrorKind::Routing || e.is_capacity()) {
                 if let Ok(r) = fit_attempt(dev, design.clone(), opts, limit, extra, &avoid, Placer::Partition) {
                     attempt = Ok(r);
                 }
             }
             if std::env::var_os("ATF_FIT_DEBUG").is_some() {
-                eprintln!("fit attempt (limit {limit}, extra {extra}): {:.2} s: {}", ta.elapsed().as_secs_f64(), attempt.as_ref().err().map_or("ok".into(), |e| e.0.chars().take(80).collect::<String>()));
+                eprintln!("fit attempt (limit {limit}, extra {extra}): {:.2} s: {}", ta.elapsed().as_secs_f64(), attempt.as_ref().err().map_or("ok".into(), |e| e.msg.chars().take(80).collect::<String>()));
             }
             match attempt {
                 Ok(r) => return Ok(r),
-                Err(e) if e.kind() == FitErrorKind::Routing && e.0.contains("[movable: ") && repairs < 96 => {
+                Err(e) if e.kind() == FitErrorKind::Routing && e.msg.contains("[movable: ") && repairs < 96 => {
                     // move one floating node out of the congested block and try again
-                    let blk = e.0.split("block ").nth(1).and_then(|x| x.chars().next()).unwrap();
+                    let blk = e.msg.split("block ").nth(1).and_then(|x| x.chars().next()).unwrap();
                     let b = (blk as u8 - b'A') as u16;
-                    let list = e.0.split("[movable: ").nth(1).unwrap().trim_end_matches(']');
+                    let list = e.msg.split("[movable: ").nth(1).unwrap().trim_end_matches(']');
                     // never push a cell out of every block but one (it would have nowhere left
                     // when that block fills up)
                     let nblk = (dev.family.macrocells() / 16) as usize;
@@ -389,11 +393,11 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
                     last = Some(e);
                 }
                 Err(e) if e.kind() == FitErrorKind::Cascade => {
-                    cascade_victim = e.0.split(':').next().map(String::from);
+                    cascade_victim = e.msg.split(':').next().map(String::from);
                     last = Some(e);
                     break;
                 }
-                Err(e) if e.kind() == FitErrorKind::Capacity => {
+                Err(e) if e.is_capacity() => {
                     // a tighter fan-in limit cannot create macrocells: skip to more doubling
                     skip_limits_for = Some(extra);
                     last = Some(e);
@@ -496,12 +500,12 @@ fn fit_attempt(
             Place::Dedicated { pin, func }
         } else if let Some(mc) = dev.pin_mc(pin).or_else(|| dev.input_only_mc(pin)) {
             if reserved_pins.contains(&pin) {
-                return err(format!("{name}: pin {pin} is reserved (JTAG/power-down)"));
+                return err(FitErrorKind::Other, format!("{name}: pin {pin} is reserved (JTAG/power-down)"));
             }
             uses[mc as usize].pad_used = true;
             Place::Pin { pin, mc }
         } else {
-            return err(format!("{name}: pin {pin} is not a user pin of {}", dev.name));
+            return err(FitErrorKind::Other, format!("{name}: pin {pin} is not a user pin of {}", dev.name));
         };
         taken_pins.insert(pin);
         place_of.insert(name.clone(), pl);
@@ -511,10 +515,10 @@ fn fit_attempt(
         if c.is_output {
             if let Some(pin) = c.pin.filter(|_| keep) {
                 let Some(mc) = dev.pin_mc(pin) else {
-                    return err(format!("{}: pin {pin} cannot be an output on {}", c.name, dev.name));
+                    return err(FitErrorKind::Other, format!("{}: pin {pin} cannot be an output on {}", c.name, dev.name));
                 };
                 if reserved_pins.contains(&pin) {
-                    return err(format!("{}: pin {pin} is reserved (JTAG/power-down)", c.name));
+                    return err(FitErrorKind::Other, format!("{}: pin {pin} is reserved (JTAG/power-down)", c.name));
                 }
                 taken_pins.insert(pin);
                 place_of.insert(c.name.clone(), Place::Pin { pin, mc });
@@ -602,7 +606,7 @@ fn fit_attempt(
                         && !reserved_mcs.contains(&m)
                         && helpers_free(m, demand[design.cell_index(&c.name).unwrap()], &place_of, &reserved_mcs, &share)
                 });
-            let Some((mc, pin)) = slot else { return err(format!("no free output pin for {}", c.name)) };
+            let Some((mc, pin)) = slot else { return err(FitErrorKind::Capacity, format!("no free output pin for {}", c.name)) };
             taken_pins.insert(pin);
             reserve_helpers(mc, demand[design.cell_index(&c.name).unwrap()], &mut reserved_mcs);
             place_of.insert(c.name.clone(), Place::Pin { pin, mc });
@@ -803,7 +807,7 @@ fn fit_attempt(
                     place_of.insert(name.clone(), Place::Dedicated { pin: p, func });
                     continue;
                 }
-                None => return err(format!("no free input pin for {name}")),
+                None => return err(FitErrorKind::InputPins, format!("no free input pin for {name}")),
             }
         };
         taken_pins.insert(pin);
@@ -872,7 +876,7 @@ fn fit_attempt(
                 );
             }
         }
-        let Some(mc) = pick else { return err(format!("no free macrocell for node {}", c.name)) };
+        let Some(mc) = pick else { return err(FitErrorKind::Capacity, format!("no free macrocell for node {}", c.name)) };
         reserve_helpers(mc, d, &mut reserved_mcs);
         place_of.insert(c.name.clone(), Place::Node { mc });
     }
@@ -905,7 +909,7 @@ fn fit_attempt(
             continue;
         }
         if let Some(j) = uses[mc as usize].cell {
-            return err(format!("{} and {} both placed on MC{mc}", design.cells[j].name, c.name));
+            return err(FitErrorKind::Other, format!("{} and {} both placed on MC{mc}", design.cells[j].name, c.name));
         }
         uses[mc as usize].cell = Some(i);
     }
@@ -974,14 +978,14 @@ fn fit_attempt(
                     Dedicated::Oe1 => Source::Oe1,
                     Dedicated::Gclk2Oe2 => Source::Oe2,
                 }),
-                _ => err(format!("signal {n} has no pad")),
+                _ => err(FitErrorKind::Other, format!("signal {n} has no pad")),
             },
-            Signal::Fold(k) => err(format!("foldback {k} is not a UIM source")),
+            Signal::Fold(k) => err(FitErrorKind::Other, format!("foldback {k} is not a UIM source")),
             Signal::Fb(n, _) => match place_of.get(n) {
                 // an always-enabled output's feedback equals its pin: the vendor routes the pad
                 Some(Place::Pin { mc, .. }) if design.cell(n).map_or(false, |c| c.oe.is_none()) => Ok(Source::Pad(*mc)),
                 Some(Place::Pin { mc, .. }) | Some(Place::Node { mc }) => Ok(Source::Fb(*mc)),
-                _ => err(format!("signal {n} has no feedback")),
+                _ => err(FitErrorKind::Other, format!("signal {n} has no feedback")),
             },
         }
     };
@@ -1010,7 +1014,7 @@ fn fit_attempt(
             (as_is, flipped)
         };
         if neg_fold(&as_is) && (flipped.len() >= 99 || neg_fold(&flipped)) {
-            return err(format!("{}: needs an inverted foldback line", c.name));
+            return err(FitErrorKind::Netlist, format!("{}: needs an inverted foldback line", c.name));
         }
         if as_is.is_empty() || Sop(as_is.clone()).is_one() {
             pl.constant = Some(!as_is.is_empty());
@@ -1052,7 +1056,7 @@ fn fit_attempt(
         }
         if let Some(ce) = &c.ce {
             if pl.clk == ClkUse::Pt {
-                return err(format!("{}: clock enable needs a global clock", c.name));
+                return err(FitErrorKind::Other, format!("{}: clock enable needs a global clock", c.name));
             }
             pl.ce_pt = true;
             pl.pts.insert(4, one_product(ce, &c.name, "clock enable")?);
@@ -1107,11 +1111,11 @@ fn fit_attempt(
                             pl.pts.insert(5, one_product(oe, &c.name, "output enable")?);
                             OeUse::Pt
                         }
-                        None => return err(format!("{}: no global OE reaches its enable signal", c.name)),
+                        None => return err(FitErrorKind::Other, format!("{}: no global OE reaches its enable signal", c.name)),
                     }
                 }
                 None if oe.is_one() => OeUse::Always,
-                None if pl.ap_pt => return err(format!("{}: PT5 needed for both preset and OE", c.name)),
+                None if pl.ap_pt => return err(FitErrorKind::Other, format!("{}: PT5 needed for both preset and OE", c.name)),
                 None => {
                     pl.pts.insert(5, one_product(oe, &c.name, "output enable")?);
                     OeUse::Pt
@@ -1158,7 +1162,7 @@ fn fit_attempt(
             } else {
                 let k = i - free.len() + 1;
                 if k > 5 || !opts.cascade {
-                    return err(format!("{}: {} product terms do not fit", c.name, n));
+                    return err(FitErrorKind::Capacity, format!("{}: {} product terms do not fit", c.name, n));
                 }
                 pl.helper_pts.insert(k, p);
             }
@@ -1169,7 +1173,7 @@ fn fit_attempt(
     for (&ri, &yi) in &host_of {
         let rp = plans[ri].clone();
         if rp.invert || rp.sum.len() != 1 || rp.constant.is_some() || !matches!(rp.clk, ClkUse::Global(_)) {
-            return err(format!("{}: cannot share a macrocell with {}", design.cells[ri].name, design.cells[yi].name));
+            return err(FitErrorKind::Other, format!("{}: cannot share a macrocell with {}", design.cells[ri].name, design.cells[yi].name));
         }
         let yp = &mut plans[yi];
         let mut reserved: BTreeSet<usize> = [2].into_iter().collect();
@@ -1182,11 +1186,11 @@ fn fit_attempt(
         let specials: BTreeMap<usize, Vec<(Signal, bool)>> =
             yp.pts.iter().filter(|(k, _)| !yp.in_sum.contains(k)).map(|(k, v)| (*k, v.clone())).collect();
         if specials.keys().any(|k| reserved.contains(k)) || !yp.helper_pts.is_empty() {
-            return err(format!("{}: cannot share a macrocell with {}", design.cells[ri].name, design.cells[yi].name));
+            return err(FitErrorKind::Other, format!("{}: cannot share a macrocell with {}", design.cells[ri].name, design.cells[yi].name));
         }
         let free: Vec<usize> = (1..=5).filter(|k| !specials.contains_key(k) && !reserved.contains(k)).collect();
         if yp.sum.len() > free.len() {
-            return err(format!("{}: cannot share a macrocell with {}", design.cells[ri].name, design.cells[yi].name));
+            return err(FitErrorKind::Other, format!("{}: cannot share a macrocell with {}", design.cells[ri].name, design.cells[yi].name));
         }
         yp.pts = specials;
         yp.in_sum.clear();
@@ -1216,7 +1220,7 @@ fn fit_attempt(
             || uses[mc as usize - 1].cell.map_or(false, |j| !shareable(j))
             || uses[mc as usize - 1].helper_for.is_some()
         {
-            return err(format!("{}: needs cascade from MC{} which is not free", c.name, mc - 1));
+            return err(FitErrorKind::Cascade, format!("{}: needs cascade from MC{} which is not free", c.name, mc - 1));
         }
         uses[mc as usize - 1].helper_for = Some(mc);
     }
@@ -1306,7 +1310,7 @@ fn fit_attempt(
                             eprintln!("  MC{m}: {}{}", if taken(m, &fold_mc) { "[hosts a fold] " } else { "" }, why);
                         }
                     }
-                    let Some(m) = m else { return err(format!("{}: no free macrocell for a foldback expander", c.name)) };
+                    let Some(m) = m else { return err(FitErrorKind::Capacity, format!("{}: no free macrocell for a foldback expander", c.name)) };
                     fold_mc.insert((k.clone(), b), m as u16);
                 }
             }
@@ -1408,7 +1412,7 @@ fn fit_attempt(
                 .collect();
             feeders.sort();
             movable.extend(feeders);
-            FitError(format!(
+            FitError::new(FitErrorKind::Routing, format!(
                 "UIM routing failed for block {} ({} distinct inputs) [movable: {}]",
                 atf15xx_arch::block_letter(b),
                 need.len(),
@@ -2226,7 +2230,7 @@ fn one_product(s: &Sop, cell: &str, what: &str) -> Result<Vec<(Signal, bool)>, F
                 FOLDS.with(|f| f.borrow_mut().insert(outer.clone(), inner));
                 Ok(vec![(Signal::Fold(outer), true)])
             } else {
-                err(format!("{cell}: {what} needs more than one product term ({} products: {})", m.0.len(), m))
+                err(FitErrorKind::Other, format!("{cell}: {what} needs more than one product term ({} products: {})", m.0.len(), m))
             }
         }
     }
@@ -2258,7 +2262,7 @@ fn write_pt(
     for (s, pos) in p {
         if let Signal::Fold(k) = s {
             if !pos {
-                return err(format!("internal: inverted foldback literal {k} in a product term"));
+                return err(FitErrorKind::Other, format!("internal: inverted foldback literal {k} in a product term"));
             }
             let m = FOLD_MC.with(|x| x.borrow()[&(k.clone(), b)]);
             fz.set(a + f.pt_foldback_column((m as usize - 1) % 16), false);
