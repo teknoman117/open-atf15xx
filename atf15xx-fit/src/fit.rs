@@ -306,6 +306,9 @@ pub const UIM_INPUTS_PER_BLOCK: usize = 40;
 /// Product terms one cell can use: its own 5 and those of up to 15 cascade helpers in its block.
 pub const MAX_CHAIN_PTS: usize = 16 * 5;
 
+/// Intermediate cubes spent on a complement that only decides between the two polarities.
+const COMPLEMENT_CHOICE_CUBES: usize = 1 << 14;
+
 /// Cells whose product terms would need more signals than a block's UIM delivers can never fit:
 /// report them instead of trying (and instead of complementing huge functions).
 pub fn check_support(design: &Design) -> Result<(), FitError> {
@@ -1088,7 +1091,16 @@ fn plan_pts(dev: &'static Device, design: &Design, opts: &Options, placed: &mut 
         let target_given = !c.active_low;
         let as_is: Vec<Vec<(Signal, bool)>> = if target_given { c.data.0.clone() } else { c.data.complement().0 };
         let flipped: Vec<Vec<(Signal, bool)>> =
-            if target_given { if c.data.0.len() > 1 { c.data.complement().0 } else { vec![vec![]; 99] } } else { c.data.0.clone() };
+            // (a complement too large to compute is never the cheaper polarity: the 99-product
+            // placeholder, as for a single product, is never chosen)
+            if target_given {
+                match (c.data.0.len() > 1).then(|| c.data.complement_within(COMPLEMENT_CHOICE_CUBES)).flatten() {
+                    Some(comp) => comp.0,
+                    None => vec![vec![]; 99],
+                }
+            } else {
+                c.data.0.clone()
+            };
         // a foldback line exists in one polarity only: a cover with a negated foldback literal
         // cannot be built (complementing a function of foldbacks can create one)
         let neg_fold = |v: &Vec<Vec<(Signal, bool)>>| v.iter().flatten().any(|(s, p)| !p && matches!(s, Signal::Fold(_)));
@@ -1743,7 +1755,8 @@ fn pt_demand(c: &Cell, xor: Option<&XorSplit>) -> usize {
         n = n.min(1 + if c.active_low { x.gbar.0.len() } else { x.g.0.len() });
     }
     if n > 1 {
-        let alt = if c.active_low { c.data.0.len() } else { c.data.complement().0.len() };
+        // the other polarity as an alternative cost; one too large to compute is no alternative
+        let alt = if c.active_low { c.data.0.len() } else { c.data.complement_within(COMPLEMENT_CHOICE_CUBES).map_or(usize::MAX, |x| x.0.len()) };
         n = n.min(alt.max(1));
     }
     if n > 3 {

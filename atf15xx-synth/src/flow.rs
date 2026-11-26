@@ -520,8 +520,8 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
             let (pd, plog) = slot.get_or_init(|| {
                 let mut d = base.clone();
                 let mut log: Vec<String> = vec![];
-                // with ATF15XX_FLOW_DEBUG, the time of each netlist pass
-                let dbg = std::env::var_os("ATF15XX_FLOW_DEBUG").is_some();
+                // with ATF15XX_FLOW_DEBUG or ATF15XX_FLOW_TIMING, the time of each netlist pass
+                let dbg = std::env::var_os("ATF15XX_FLOW_DEBUG").is_some() || std::env::var_os("ATF15XX_FLOW_TIMING").is_some();
                 let mut tp = std::time::Instant::now();
                 let mut lap = |what: &str| {
                     if dbg {
@@ -568,6 +568,8 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
             let mut d = pd.clone();
             let mut log = plog.clone();
             let t = if o.emit_tt2 { Some(tt2out::write(&d, &part.device.tt2_device)?) } else { None };
+            let tv = std::time::Instant::now();
+            let timing = std::env::var_os("ATF15XX_FLOW_TIMING").is_some();
             if vcollapse {
                 // shared nodes feeding control functions become foldback signals first (the vendor's
                 // XXL_ nodes): they stay shared instead of being expanded into every reader.
@@ -610,10 +612,18 @@ pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &st
                     }
                 }
                 d.collapse_comb_nodes();
+                if timing {
+                    eprintln!("strategy {si}: vendor-style collapse: {:.2} s", tv.elapsed().as_secs_f64());
+                }
                 log.push("vendor-style node collapse".into());
             }
+            let tq = std::time::Instant::now();
             d.absorb_output_registers();
+            let ta = tq.elapsed().as_secs_f64();
             d.legalize_special_functions_with(special_foldback);
+            if timing {
+                eprintln!("pass absorb: {ta:.2} s, legalize: {:.2} s", tq.elapsed().as_secs_f64() - ta);
+            }
             if seed > 0 {
                 shuffle(&mut d.cells, seed);
             }

@@ -107,6 +107,17 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** — Time to failure, continued (18-bit registered compare, ATF1504AS-TQFP100,
+  one thread 74 → 50 s, same fit 60/64): (1) `Design::collapse_comb_nodes`: the foldback check of
+  every candidate node computed both its covers even when no foldback product reads the node (then
+  the answer is always yes): 21 s of complements skipped. (2) `plan_pts`' flipped polarity and
+  `pt_demand`'s alternative cost ask `Sop::complement_within` (memoised now, `COMPLEMENT_CHOICE_CUBES`
+  = 16384): a complement too large to compute is never the cheaper polarity; within the plain
+  complement's 4096 cubes the answer is unchanged. Remaining: the UIM repair loop (96 moves, ~0.11
+  s per attempt in placement: `fanin_ok`, `uim_ids`) in failing strategies, ~38 of the 50 s.
+  `ATF15XX_FLOW_TIMING` now also times the netlist passes, the vendor-style collapse and
+  absorb/legalize. Checks: vendor identity unchanged, corpus (37) and examples byte-identical,
+  SELFPROGRAMBOARD unchanged, tests 48/48.
 * **2026-11-26** — `fit_attempt` (1165 lines) split into its passes (user request): `place_cells`
   → `global_nets` → `plan_pts` → `host_foldbacks` → `route_uim` → `assemble`, with the state
   they hand on in `Placed`, `Nets`, `Folds`, `Routing`; `fit_attempt` is the 15-line driver.

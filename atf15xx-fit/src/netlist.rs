@@ -543,6 +543,10 @@ impl Design {
                         _ => None,
                     })
                     .collect();
+                // (no foldback reads it: nothing to check, and its covers may be costly)
+                if refs.is_empty() {
+                    return true;
+                }
                 let (f, fnot) = if c.active_low { (c.data.complement(), c.data.minimize()) } else { (c.data.minimize(), c.data.complement()) };
                 refs.iter().all(|&v| if v { f.0.len() == 1 } else { fnot.0.len() == 1 })
             };

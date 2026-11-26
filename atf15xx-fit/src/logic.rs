@@ -168,14 +168,32 @@ impl Sop {
     /// needs that many cubes is not). Within [`PLAIN_COMPLEMENT_LIMIT`] the result is exactly
     /// [`Sop::complement`]'s; functions of more than 64 signals return None.
     pub fn complement_within(&self, max_cubes: usize) -> Option<Sop> {
-        let (vars, cover) = self.encode();
-        let c = cover?;
-        let mut budget = PLAIN_COMPLEMENT_LIMIT;
-        if complement_plain(&c, vars.len(), &mut budget).is_some() {
-            return Some(self.complement());
+        // memoised per thread like the others: the fitter asks again in every attempt
+        thread_local! {
+            static WITHIN: std::cell::RefCell<rustc_hash::FxHashMap<(Sop, usize), Option<Sop>>> = Default::default();
         }
-        let raw = complement_folded_within(&c, vars.len(), max_cubes)?;
-        Some(decode(&vars, &irredundant(&merge(raw))))
+        let key = (self.clone(), max_cubes);
+        if let Some(r) = WITHIN.with(|m| m.borrow().get(&key).cloned()) {
+            return r;
+        }
+        let r = (|| {
+            let (vars, cover) = self.encode();
+            let c = cover?;
+            let mut budget = PLAIN_COMPLEMENT_LIMIT;
+            if complement_plain(&c, vars.len(), &mut budget).is_some() {
+                return Some(self.complement());
+            }
+            let raw = complement_folded_within(&c, vars.len(), max_cubes)?;
+            Some(decode(&vars, &irredundant(&merge(raw))))
+        })();
+        WITHIN.with(|m| {
+            let mut m = m.borrow_mut();
+            if m.len() >= MEMO_MAX {
+                m.clear();
+            }
+            m.insert(key, r.clone());
+        });
+        r
     }
 
     /// The complement if it has at most `max_products` products (None otherwise). Wide
