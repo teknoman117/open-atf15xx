@@ -40,29 +40,53 @@ pub enum MapMode {
     Auto,
 }
 
-/// Is fit `b` better than fit `a` (spec F8.7, F9.9)? Meeting the timing targets first; then
-/// with the area goal fewer macrocells, then fmax; with the speed goal fmax, then macrocells.
+/// Is fit `b` better than fit `a` (spec F8.7, F9.9)? Meeting the timing targets first; if both
+/// miss them, the one that misses by less (worst relative shortfall, see [`judge`]); then with
+/// the area goal fewer macrocells, then fmax; with the speed goal fmax, then macrocells.
 pub fn better(a: &Outputs, b: &Outputs) -> bool {
-    let mcs = |o: &Outputs| macrocells_used(&o.result) as f64;
-    let f = |o: &Outputs| o.fmax_mhz.unwrap_or(f64::INFINITY);
-    if let (Some(ta), Some(tb)) = (a.timing_met, b.timing_met) {
-        if ta != tb {
-            return tb;
-        }
+    let key = |o: &Outputs| {
+        fit_key(
+            o.goal,
+            o.timing_met.unwrap_or(true),
+            o.timing_shortfall.unwrap_or(0.0),
+            macrocells_used(&o.result),
+            o.fmax_mhz.unwrap_or(f64::INFINITY),
+        )
+    };
+    key(b) > key(a)
+}
+
+/// The ranking of fits, larger is better, shared by the strategy search, the piece forms and the
+/// mappings (spec F8.7): meeting the timing targets; then missing them by less (`shortfall`, 0
+/// when met or without targets); then by the goal fewer macrocells and higher fmax, or the
+/// reverse order.
+pub fn fit_key(goal: Goal, met: bool, shortfall: f64, macrocells: usize, fmax: f64) -> (bool, f64, f64, f64) {
+    if goal == Goal::Speed {
+        (met, -shortfall, fmax, -(macrocells as f64))
+    } else {
+        (met, -shortfall, -(macrocells as f64), fmax)
     }
-    let key = |o: &Outputs| if o.goal == Goal::Speed { (-f(o), mcs(o)) } else { (mcs(o), -f(o)) };
-    key(b) < key(a)
 }
 
 /// A fit against the timing targets (spec F8.7): all met?, its fmax (MHz, infinite without
-/// register paths), and the violations as text. `clocks`: (Verilog name, netlist name, MHz).
-pub fn judge(r: &FitResult, t: &TimingTargets, grade: &str, clocks: &[(String, String, f64)]) -> Result<(bool, f64, Vec<String>), String> {
+/// register paths), the violations as text, and the worst relative shortfall over all targets
+/// (0 when all are met; `(want - got) / want` for a frequency, `(got - want) / want` for a
+/// delay; 1 for a clock target that cannot be measured), which ranks fits that all miss.
+/// `clocks`: (Verilog name, netlist name, MHz).
+pub fn judge(
+    r: &FitResult,
+    t: &TimingTargets,
+    grade: &str,
+    clocks: &[(String, String, f64)],
+) -> Result<(bool, f64, Vec<String>, f64), String> {
     let rep = timing_of(r, grade)?;
     let fmax = rep.fmax_mhz.unwrap_or(f64::INFINITY);
     let mut v = vec![];
+    let mut short = 0f64;
     if let Some(want) = t.fmax {
         if fmax < want {
             v.push(format!("fmax {fmax:.1} MHz < {want:.1} MHz"));
+            short = short.max((want - fmax) / want);
         }
     }
     for (vname, nname, want) in clocks {
@@ -71,12 +95,16 @@ pub fn judge(r: &FitResult, t: &TimingTargets, grade: &str, clocks: &[(String, S
             _ => None,
         });
         match pin.map(|p| rep.period_for_clock(p)) {
-            None => v.push(format!("clock {vname}: not on a pin")),
+            None => {
+                v.push(format!("clock {vname}: not on a pin"));
+                short = short.max(1.0);
+            }
             Some(None) => {}
             Some(Some(per)) => {
                 let f = 1000.0 / per;
                 if f < *want {
                     v.push(format!("clock {vname}: {f:.1} MHz < {want:.1} MHz"));
+                    short = short.max((want - f) / want);
                 }
             }
         }
@@ -89,10 +117,11 @@ pub fn judge(r: &FitResult, t: &TimingTargets, grade: &str, clocks: &[(String, S
         if let (Some(w), Some(want)) = (worst, want) {
             if w > want {
                 v.push(format!("{what} {w:.1} ns > {want:.1} ns"));
+                short = short.max((w - want) / want);
             }
         }
     }
-    Ok((v.is_empty(), fmax, v))
+    Ok((v.is_empty(), fmax, v, short))
 }
 
 /// The word-level synthesis script (spec F9.9).
@@ -268,6 +297,8 @@ pub struct Outputs {
     /// fmax (MHz) of the fit, and whether it meets the timing targets (None: none given).
     pub fmax_mhz: Option<f64>,
     pub timing_met: Option<bool>,
+    /// The worst relative shortfall against the targets (0 when met; None without targets).
+    pub timing_shortfall: Option<f64>,
     /// The optimisation goal the fit was chosen for.
     pub goal: Goal,
 }
@@ -548,7 +579,7 @@ fn fit_lowered(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &str) -
     // with --fmax: keep trying strategies until one meets it (best fmax kept meanwhile)
     let mut met = false;
     let mut best_fmax = f64::NEG_INFINITY;
-    let mut best_key: Option<(bool, f64, f64)> = None;
+    let mut best_key: Option<(bool, f64, f64, f64)> = None;
     // one strategy's netlist passes and fit, as a pure function of the strategy (spec F9.11):
     // the driver below keeps the sequential decisions and fits the next strategies of the queue
     // speculatively in parallel (rayon), caching their outcomes
@@ -805,17 +836,11 @@ fn fit_lowered(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &str) -
                     }
                 } else {
                     // timing first (F8.7): a fit that meets the targets beats one that does not,
-                    // even with more macrocells (e.g. one logic level wider instead of two)
-                    let (ok, f, _) = judge(&r, &targets, &o.grade, &clock_targets)?;
-                    let key = |ok: bool, f: f64, used: usize| -> (bool, f64, f64) {
-                        if targets.goal == Goal::Speed {
-                            (ok, f, -(used as f64))
-                        } else {
-                            (ok, -(used as f64), f)
-                        }
-                    };
-                    let k = key(ok, f, used);
-                    if best_key.map_or(true, |b: (bool, f64, f64)| k > b) {
+                    // even with more macrocells (e.g. one logic level wider instead of two); of
+                    // fits that all miss, the one that misses by less (its shortfall is 0 when met)
+                    let (ok, f, _, short) = judge(&r, &targets, &o.grade, &clock_targets)?;
+                    let k = fit_key(targets.goal, ok, short, used, f);
+                    if best_key.map_or(true, |b: (bool, f64, f64, f64)| k > b) {
                         best_key = Some(k);
                         met = ok;
                         best_fmax = f;
@@ -858,14 +883,14 @@ fn fit_lowered(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &str) -
         .collect();
     let timing = tr.text(&|mc| names.get(&mc).map_or(format!("MC{mc}"), |n| format!("{n} (MC{mc})")), 20);
     let _ = best_fmax;
-    let timing_met = if targets.any() {
-        let (ok, _, v) = judge(&result, &targets, &o.grade, &clock_targets)?;
+    let (timing_met, timing_shortfall) = if targets.any() {
+        let (ok, _, v, short) = judge(&result, &targets, &o.grade, &clock_targets)?;
         if !ok {
             warnings.push(format!("timing targets missed (speed grade {}): {}; see {}.timing.rpt", o.grade, v.join(", "), imp.top));
         }
-        Some(ok)
+        (Some(ok), Some(short))
     } else {
-        None
+        (None, None)
     };
     let created = o.created.clone().unwrap_or_else(|| chrono::Local::now().format("%a %b %d %H:%M:%S %Y").to_string());
     let jed_text = jed::write(&result.fuses, &created, part.device.pin_count());
@@ -947,6 +972,7 @@ fn fit_lowered(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &str) -
         timing,
         fmax_mhz: tr.fmax_mhz,
         timing_met,
+        timing_shortfall,
         goal: targets.goal,
     })
 }
@@ -1082,4 +1108,24 @@ pub fn write_outputs(o: &Outputs, dir: &Path) -> Result<Vec<PathBuf>, String> {
         put("tt2", t.as_bytes())?;
     }
     Ok(files)
+}
+
+#[cfg(test)]
+mod ranking_tests {
+    use super::*;
+
+    /// A missed target ranks fits by how close they come (2026-11-26): the 10-bit registered
+    /// compare's candidates on the ATF1502AS, asked for 55 MHz (all miss).
+    #[test]
+    fn missed_targets_rank_by_shortfall() {
+        let short = |f: f64| (55.0 - f) / 55.0;
+        let small_slow = fit_key(Goal::Area, false, short(41.7), 26, 41.7);
+        let big_fast = fit_key(Goal::Area, false, short(52.6), 31, 52.6);
+        assert!(big_fast > small_slow);
+        // met beats missed, whatever the size
+        assert!(fit_key(Goal::Area, true, 0.0, 31, 52.6) > fit_key(Goal::Area, false, 0.01, 10, 54.0));
+        // without a target (or with all met): the goal decides, as before
+        assert!(fit_key(Goal::Area, true, 0.0, 27, 41.7) > fit_key(Goal::Area, true, 0.0, 31, 52.6));
+        assert!(fit_key(Goal::Speed, true, 0.0, 31, 52.6) > fit_key(Goal::Speed, true, 0.0, 27, 41.7));
+    }
 }

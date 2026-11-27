@@ -238,18 +238,25 @@ tsu      8           # worst input setup (ns)
 optimize area        # or speed
 ```
 
-**Selection** (`flow::judge`, the strategy loop, `flow::better` across mappings):
+**Selection** (`flow::judge` and `flow::fit_key`, shared by the strategy loop, the wide-compare
+piece forms (F9.12) and `flow::better` across mappings):
 
 1. A fit that meets every target beats one that does not, **whatever it costs in macrocells**.
    This is the "two levels of logic cost more area but close timing" rule. When a target is
    given, the strategy queue also contains the wider-sum strategies (`max_products` 15/20/25:
    cascades at tPEXP per stage instead of tUIM + tLAD + tCOMB per extra level), tried when the
    area-first ones miss.
-2. Among fits that meet the targets (or all fits, if none does): `optimize area` takes the fewest
+2. Of fits that all miss the targets, the one that misses by less (since 2026-11-26): the worst
+   relative shortfall over all targets, `(want − got) / want` for a frequency, `(got − want) /
+   want` for a delay (1 for a clock target that cannot be measured). Before, missed fits ranked
+   by area: a 10-bit registered compare on the ATF1502AS asked for 55 MHz got 26 MCs at 41.7 MHz
+   although a 31-MC, 52.6 MHz fit was among the candidates (asked for 50 MHz it got that one); now
+   it gets 52.6 MHz. Unit test `missed_targets_rank_by_shortfall`.
+3. Among fits that meet the targets (or without targets): `optimize area` takes the fewest
    macrocells, then the highest fmax, and stops at the first strategy that meets the targets.
    `optimize speed` takes the highest fmax, then the fewest macrocells, and scans the
    strategies (without shuffled orders) for the best one.
-3. Missed targets are reported with each violation (`timing targets missed: tPD 21.0 ns > 10.0
+4. Missed targets are reported with each violation (`timing targets missed: tPD 21.0 ns > 10.0
    ns`), the best fit is still written, and the CLI exits with status 2.
 
 The register-to-register paths carry the pin of the capturing global clock (`RegPath::clock_pin`),

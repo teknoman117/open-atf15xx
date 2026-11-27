@@ -192,6 +192,15 @@ is green.
 
 ## Journal
 
+* **2026-11-26** (main session) — Missed timing targets rank fits by closeness (F8.7 rule 2,
+  user request "at all three levels"): `judge` also returns the worst relative shortfall, and one
+  ranking `fit_key` (met, −shortfall, then the goal's order) serves the strategy loop, the
+  wide-compare piece forms and `better` across mappings (CLI and plugin). 10-bit registered
+  compare on the ATF1502AS: `--fmax 55` / `--fmax 80` now 31 MCs at 52.6 MHz (was 26 MCs at
+  41.7 MHz); default and reachable targets unchanged. Corpus (no design sets a target), examples
+  and SELFPROGRAMBOARD byte-identical; SELFPROGRAMBOARD with `--fmax 60` or `tpd 8` unchanged
+  (52.6 MHz is its fastest fit either way); tests 49/49 (new `missed_targets_rank_by_shortfall`);
+  plugin builds.
 * **2026-11-26** (main session) — Wide compares from pieces (F9.12, user: "go ahead with
   coarse-level mapping"): `wordmap.rs` builds `$eq/$ne/$lt/$le/$gt/$ge` wider than 8 bits from
   pieces in two forms (XOR nodes + 4-bit pieces, or flat 3-bit pieces); the flow fits both and
