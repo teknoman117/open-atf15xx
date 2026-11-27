@@ -87,9 +87,7 @@ pub fn pt_demand_with(c: &Cell, data: &Sop, xor: Option<&XorSplit>) -> usize {
 }
 
 /// Products left after foldback factoring of `target` down to 3 (see [`factor_with_foldback`]),
-/// memoised per thread: every fit attempt of every strategy asks again for the same covers. The
-/// factoring also registers its foldbacks in FOLDS, which planning resets before it factors for
-/// real, so a cached answer loses nothing.
+/// memoised per thread: every fit attempt of every strategy asks again for the same covers.
 pub fn factored_len(target: &Sop) -> usize {
     thread_local! {
         static FACTORED: std::cell::RefCell<rustc_hash::FxHashMap<Sop, usize>> = Default::default();
@@ -100,7 +98,7 @@ pub fn factored_len(target: &Sop) -> usize {
     let mut s = target.0.clone();
     while s.len() > 3 {
         match crate::fit::factor_with_foldback(&s) {
-            Some(x) => s = x,
+            Some((x, _, _)) => s = x,
             None => break,
         }
     }

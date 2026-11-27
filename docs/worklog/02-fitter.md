@@ -107,6 +107,21 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-27** (main session) — `fit.rs` (2,800 lines) split into the module `fit/`, one file
+  per pass (user request: cut the spaghetti): `mod.rs` (options, results, errors, the attempt
+  driver and the state between passes, 600 lines), `place.rs`, `partition.rs`, `positions.rs`,
+  `nets.rs`, `pts.rs`, `fold.rs`, `uim.rs`, `encode.rs`, `bound.rs`; cut mechanically by top-level
+  item (git keeps `fit.rs` → `fit/mod.rs`). Then: the foldback products travel explicitly
+  (`FoldTable`, returned by `plan_pts` and passed to `host_foldbacks`) instead of through the
+  thread-local `FOLDS`, which every factoring step wrote, including the estimate during
+  placement; placement is a `PlaceState` with one method per phase (the 486-line `place_cells`
+  is now a 40-line driver in the vendor's order, no closures taking `&mut` maps); planning is a
+  `Planner` with a method per macrocell feature (polarity, clock and enable, reset, OE, sum and
+  chain) plus `double_logic` and `reserve_cascade_helpers`; the never-filled
+  `Placed::placement` is gone (the result's placement is built once, from `place_of`). Largest
+  function now `partition_blocks` (179 lines). Checks after each of the three steps, all
+  byte-identical: tests 52/52, corpus and examples, all 12,624 vendor-design JEDs (identity 2017 /
+  4025 / 6155), the 29-design benchmark (JEDs and results; 397 s).
 * **2026-11-27** (main session) — Cascade chains and one capacity model (user request: make the
   splitter, placement and the planner agree). The three disagreed: the flow's splitter assumed
   a macrocell plus one helper (10 terms), placement reserved up to 15 helpers (80 terms), the

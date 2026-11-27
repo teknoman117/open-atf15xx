@@ -195,7 +195,7 @@ encoding, code 0).
 ### F2.3.3 What the vendor writes for each kind of macrocell [O]
 
 The fitter is byte-compatible only if it reproduces these "don't care" choices
-(`atf15xx-fit/src/fit.rs`, `encode_unused` / `encode_logic`). Bit strings below list the
+(`atf15xx-fit/src/fit/encode.rs`, `encode_unused` / `encode_logic`). Bit strings below list the
 24 bits in the order of the table in F2.3.1 (k0 k1 per pair):
 
 | role | bits |
