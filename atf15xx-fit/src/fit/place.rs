@@ -9,6 +9,7 @@ use super::*;
 pub(super) fn place_cells(
     dev: &'static Device,
     design: &mut Design,
+    demand: &[usize],
     opts: &Options,
     fanin_limit: usize,
     extra_pairs: usize,
@@ -20,7 +21,7 @@ pub(super) fn place_cells(
     st.place_pinned_inputs(design)?;
     st.place_pinned_outputs(design)?;
     st.apply_node_constraints(design);
-    st.estimate_demand(design)?;
+    st.estimate_demand(design, demand)?;
     for n in &want_clk {
         st.grab_dedicated(n, &[Dedicated::Gclk1, Dedicated::Gclk2Oe2]);
     }
@@ -203,10 +204,10 @@ impl<'a> PlaceState<'a> {
         }
     }
 
-    /// Product-term demand per cell (estimate), and cascade helper reservations below the cells
-    /// placed so far.
-    fn estimate_demand(&mut self, design: &Design) -> Result<(), FitError> {
-        self.demand = design.cells.iter().map(|c| pt_demand(c, design.xor.get(&c.name))).collect();
+    /// Product-term demand per cell (the estimate `fit_design` computed), and cascade helper
+    /// reservations below the cells placed so far.
+    fn estimate_demand(&mut self, design: &Design, demand: &[usize]) -> Result<(), FitError> {
+        self.demand = demand.to_vec();
         // a cell borrows cascade helpers only within its block, at most a chain of MAX_CHAIN_MCS
         // (crate::capacity): placement uses the same estimate, so a larger demand can never be
         // placed (spec F4.3)

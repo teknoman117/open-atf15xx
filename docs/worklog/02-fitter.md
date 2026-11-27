@@ -107,6 +107,25 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-27** (main session) — Repair-loop cost (user request: fix the 20-bit compare's
+  slowdown; no multicore unless it wins). Measured on the 20-bit compare's gate mapping (fails
+  either way; 83.6 s single-threaded): (1) strategies 0/3/4 and 1/2 handed the fitter identical
+  netlists: `search` now fits each distinct netlist once (key: the netlist's full `Debug` text
+  and `special_foldback`; deterministic fitter, one shared deadline); (2) the PT-demand estimate
+  of every cell was recomputed in every attempt: once per round in `fit_design` now; (3)
+  planning was 40 ms per attempt, all placement-independent: per-thread memos of
+  `factor_with_foldback`, of the polarity choice (`polarity_memo`, by cover and polarity) and
+  of a cell's whole foldback factoring (`FACTORED`, replaying the foldbacks it created): 1.9 ms;
+  (4) the partitioner cloned a cell name for every one of its 160,000 moves to ask the avoid set:
+  a cell × block table now, and the swap candidates reuse one buffer (same random sequence,
+  same decisions). Gate mapping 83.6 → 25.6 s. Then the strategy search's speculative parallel
+  batches were measured over the whole benchmark: 1 thread 405.3 s, 16 threads 397.9 s (cold
+  per-thread memos; some designs faster, some slower), so the search is sequential now; the
+  mappings and piece forms still run side by side (independent jobs). Host regression (no
+  Docker that day: every stored Yosys netlist of the corpus, examples and benchmark refitted with
+  the pushed HEAD and with the new code, `.scratch/refac/hostcheck.py`): 146 of 146 fits
+  byte-identical, 628.9 → 443.2 s; tests 60/60; vendor identity 2017 / 4025 / 6155 and all
+  12,624 JEDs byte-identical; cascade designs 36 of 44 identical as before.
 * **2026-11-27** (main session) — Chains laid out as the vendor does (HANDOFF item 6). The vendor
   corpus of 12,624 designs has no cascade at all (`atf15xx-sim stats`), so the chain layout had
   never been compared; the 60 `fitter-cascade` designs showed it: products 1, 2, …, n−1, 0 fill

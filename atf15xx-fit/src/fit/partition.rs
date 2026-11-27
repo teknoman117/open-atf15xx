@@ -86,7 +86,10 @@ pub(super) fn partition_blocks(
     // cell index -> block (NONE: not placed by the partitioner)
     const NONE: usize = usize::MAX;
     let mut blk: Vec<usize> = vec![NONE; design.cells.len()];
-    let allowed = |i: usize, b: usize| !avoid.contains(&(design.cells[i].name.clone(), b as u16));
+    // the avoid set as a cell x block table: the local search asks it for every move
+    let banned: Vec<Vec<bool>> =
+        design.cells.iter().map(|c| (0..nb).map(|b| avoid.contains(&(c.name.clone(), b as u16))).collect()).collect();
+    let allowed = |i: usize, b: usize| !banned[i][b];
     let mut order = floating.clone();
     order.sort_by_key(|&i| std::cmp::Reverse(cell_ids[i].len()));
     for &i in &order {
@@ -124,6 +127,7 @@ pub(super) fn partition_blocks(
             use rand::{Rng, SeedableRng};
             let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(restart);
             let mut rnd = |n: usize| rng.random_range(0..n);
+            let mut cands: Vec<usize> = Vec::with_capacity(placed.len());
             for _ in 0..20000 {
                 let i = placed[rnd(placed.len())];
                 let from = blk[i];
@@ -147,7 +151,8 @@ pub(super) fn partition_blocks(
                     }
                 } else {
                     // swap with a cell of the target block
-                    let cands: Vec<usize> = placed.iter().copied().filter(|&j| blk[j] == to).collect();
+                    cands.clear();
+                    cands.extend(placed.iter().copied().filter(|&j| blk[j] == to));
                     if cands.is_empty() {
                         continue;
                     }

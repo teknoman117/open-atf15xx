@@ -309,11 +309,17 @@ pub fn search(dev: &'static Device, d: Design, opts: &Options, so: &SearchOption
     let base = &d;
     type Prefix = std::sync::Arc<std::sync::OnceLock<(crate::netlist::Design, Vec<String>)>>;
     let prefix_cache: std::sync::Mutex<std::collections::HashMap<(usize, bool, bool, bool), Prefix>> = Default::default();
+    // different strategies often hand the fitter the same netlist (their knobs change nothing on
+    // it): the fit of each distinct netlist (the full netlist and the one option that varies, as
+    // the key) is computed once and reused; the fitter is deterministic and all strategies share
+    // one deadline
+    type FitSlot = std::sync::Arc<std::sync::OnceLock<Result<FitResult, crate::fit::FitError>>>;
+    let fit_cache: std::sync::Mutex<std::collections::HashMap<String, FitSlot>> = Default::default();
     let run = |st: Strategy, si: usize| -> Result<Outcome, String> {
         let t_pass = std::time::Instant::now();
         let Strategy { mp, ties, enables, spread, seed, vcollapse, toggles, special_foldback, fold_one_level } = st;
         // the netlist passes up to the split depend only on these knobs: computed once per
-        // key and shared by the strategies (and threads) that need them (spec F9.11)
+        // key and shared by the strategies that need them (spec F9.11)
         let key = (mp, toggles, enables, ties);
         let slot = prefix_cache
             .lock()
@@ -461,7 +467,9 @@ pub fn search(dev: &'static Device, d: Design, opts: &Options, so: &SearchOption
         let name = d.name.clone();
         let passes_s = t_pass.elapsed().as_secs_f64();
         let t_fit = std::time::Instant::now();
-        let fit = fit_design(dev, d, &sopts);
+        let key = format!("{special_foldback}|{d:?}");
+        let slot = fit_cache.lock().expect("fit cache").entry(key).or_default().clone();
+        let fit = slot.get_or_init(|| fit_design(dev, d, &sopts)).clone();
         if std::env::var_os("ATF15XX_FLOW_TIMING").is_some() {
             let ((mh, mm), (ch, cm)) = crate::logic::memo_stats();
             eprintln!(
@@ -474,8 +482,6 @@ pub fn search(dev: &'static Device, d: Design, opts: &Options, so: &SearchOption
         }
         Ok(Outcome { log, t, name, n_cells, n_buried, n_pins_in, fit })
     };
-    let threads = rayon::current_num_threads().max(1);
-    let mut cache: std::collections::HashMap<Strategy, Result<Outcome, String>> = std::collections::HashMap::new();
     while let Some(st) = queue.pop_front() {
         if tried.contains(&st) {
             continue;
@@ -502,26 +508,9 @@ pub fn search(dev: &'static Device, d: Design, opts: &Options, so: &SearchOption
             warnings.push(format!("fit time budget of {} s used up after {si} strategies (--fit-time)", so.fit_time));
             break;
         }
-        // the outcome: cached, or fitted now together with the next untried strategies
-        if !cache.contains_key(&st) {
-            use rayon::prelude::*;
-            // only strategies known to be needed run speculatively: the pending capacity
-            // strategies of a dense design, all of which are fitted anyway (a wider speculation
-            // fitted strategies the sequential search never reaches, and the batch waits for the
-            // slowest: measured slower)
-            let mut batch = vec![st];
-            for s in queue.iter() {
-                if batch.len() >= threads {
-                    break;
-                }
-                if capacity_pending.contains(s) && !tried.contains(s) && !cache.contains_key(s) && !batch.contains(s) {
-                    batch.push(*s);
-                }
-            }
-            let outs: Vec<(Strategy, Result<Outcome, String>)> = batch.par_iter().enumerate().map(|(k, s)| (*s, run(*s, si + k))).collect();
-            cache.extend(outs);
-        }
-        let Outcome { log, t, name, n_cells, n_buried, n_pins_in, fit } = cache.remove(&st).expect("outcome")?;
+        // strategies run one after the other: fitting them side by side was measured to win
+        // nothing (each thread starts with cold memos; 29-design benchmark, 2026-11-27)
+        let Outcome { log, t, name, n_cells, n_buried, n_pins_in, fit } = run(st, si)?;
         if si == 0 {
             tt2 = t.clone();
             if let (Some(t), Some(dir)) = (&t, &so.debug_dir) {

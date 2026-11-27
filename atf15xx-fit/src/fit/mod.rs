@@ -147,7 +147,7 @@ impl Default for Options {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 #[error("{msg}")]
 pub struct FitError {
     /// What the failure is about, set where it is raised (spec F9.11).
@@ -393,6 +393,9 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
         }
     };
     for _split_round in 0..200 {
+        // the product-term demand per cell (crate::capacity::pt_demand): fixed while the netlist
+        // is, so computed once per round instead of in every attempt's placement
+        let demand: Vec<usize> = design.cells.iter().map(|c| pt_demand(c, design.xor.get(&c.name))).collect();
         let mut cascade_victim = None;
         let mut retry = false;
         let mut skip_limits_for: Option<usize> = None;
@@ -410,9 +413,9 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
             // that runs out of macrocells or UIM inputs, the same budget with the partitioner
             // then the partitioner (with the UIM position search), only if the greedy placement
             // failed: keeps the vendor's placements byte-identical
-            let mut attempt = fit_attempt(dev, design.clone(), opts, limit, extra, &avoid, Placer::Greedy);
+            let mut attempt = fit_attempt(dev, design.clone(), &demand, opts, limit, extra, &avoid, Placer::Greedy);
             if matches!(&attempt, Err(e) if e.kind() == FitErrorKind::Routing || e.is_capacity()) {
-                if let Ok(r) = fit_attempt(dev, design.clone(), opts, limit, extra, &avoid, Placer::Partition) {
+                if let Ok(r) = fit_attempt(dev, design.clone(), &demand, opts, limit, extra, &avoid, Placer::Partition) {
                     attempt = Ok(r);
                 }
             }
@@ -502,6 +505,7 @@ enum Placer {
 fn fit_attempt(
     dev: &'static Device,
     mut design: Design,
+    demand: &[usize],
     opts: &Options,
     fanin_limit: usize,
     extra_pairs: usize,
@@ -511,7 +515,7 @@ fn fit_attempt(
     uim_memo_clear();
     // the passes of one attempt (spec F4): placement, global networks, product-term plans,
     // foldback expanders, UIM routing, fuse assembly
-    let mut placed = place_cells(dev, &mut design, opts, fanin_limit, extra_pairs, avoid, placer)?;
+    let mut placed = place_cells(dev, &mut design, demand, opts, fanin_limit, extra_pairs, avoid, placer)?;
     let mut nets = global_nets(dev, &design, opts, &placed);
     let (mut plans, fold_products) = plan_pts(dev, &design, opts, &mut placed, &mut nets)?;
     let folds = host_foldbacks(&design, opts, &mut placed, &mut plans, &fold_products)?;

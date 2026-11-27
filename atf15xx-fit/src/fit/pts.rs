@@ -62,7 +62,22 @@ impl Planner<'_> {
 
     fn plan_cell(&mut self, c: &Cell, fast_in: bool, hosting: bool) -> Result<PtPlan, FitError> {
         let mut pl = PtPlan::default();
-        let (as_is, flipped) = self.choose_polarity(c, &mut pl)?;
+        // the polarity choice depends on the cell alone: memoised per thread (every attempt of
+        // every strategy plans the same cells again)
+        let pol = polarity_memo(c, || {
+            let mut p = PtPlan::default();
+            self.choose_polarity(c, &mut p).map(|(as_is, flipped)| Polarity {
+                as_is,
+                flipped,
+                sum: p.sum,
+                invert: p.invert,
+                constant: p.constant,
+            })
+        })?;
+        pl.sum = pol.sum.clone();
+        pl.invert = pol.invert;
+        pl.constant = pol.constant;
+        let (as_is, flipped) = (&pol.as_is, &pol.flipped);
         if fast_in {
             // D comes from the pad through the D/Q fast path: no data product at all
             pl.fast_in = true;
@@ -87,7 +102,7 @@ impl Planner<'_> {
             pl.pts.insert(5, one_product(ap, &c.name, "asynchronous preset", &mut self.folds)?);
         }
         pl.oe = self.plan_oe(c, &mut pl)?;
-        self.plan_sum(c, &mut pl, &as_is, &flipped)?;
+        self.plan_sum(c, &mut pl, as_is, flipped)?;
         Ok(pl)
     }
 
@@ -226,34 +241,29 @@ impl Planner<'_> {
         // (`L&a # L&b # L&!c` = `L & !(!a & !b & c)`), as the vendor does
         let free: Vec<usize> = (1..=5).filter(|k| !pl.pts.contains_key(k)).collect();
         if self.opts.foldback && pl.sum.len() > free.len() && pl.constant.is_none() {
-            let folds = &mut self.folds;
-            let mut factor = |mut s: Cover| {
-                while s.len() > free.len() {
-                    match factor_with_foldback(&s) {
-                        Some((x, key, fold)) => {
-                            folds.insert(key, fold);
-                            s = x
-                        }
-                        None => break,
-                    }
-                }
-                s
-            };
-            // factor the chosen polarity; if it still does not fit, the other polarity may
-            // factor better (`L&a&(b+c+!d) + ...` has a larger cover but a common cube)
-            let mine = factor(pl.sum.clone());
-            let other_cover = if pl.invert { as_is.clone() } else { flipped.clone() };
-            if !pl.xor && mine.len() > free.len() && !other_cover.is_empty() && other_cover.len() < 99 && !Sop(other_cover.clone()).is_one()
-            {
-                let other = factor(other_cover);
-                if other.len() < mine.len() {
-                    pl.sum = other;
-                    pl.invert = !pl.invert;
-                } else {
-                    pl.sum = mine;
+            // a function of the cell and its free PTs only: memoised per thread with the
+            // foldbacks it creates, which are replayed into this attempt's table
+            let key = (c.data.clone(), c.active_low, pl.xor, pl.invert, free.len());
+            if let Some(hit) = FACTORED.with(|m| m.borrow().get(&key).cloned()) {
+                let (sum, invert, created) = &*hit;
+                pl.sum = sum.clone();
+                pl.invert = *invert;
+                for (k, f) in created {
+                    self.folds.insert(k.clone(), f.clone());
                 }
             } else {
-                pl.sum = mine;
+                let mut created: Vec<(String, Vec<(Signal, bool)>)> = vec![];
+                self.factor_sum(pl, as_is, flipped, &free, &mut created);
+                for (k, f) in &created {
+                    self.folds.insert(k.clone(), f.clone());
+                }
+                FACTORED.with(|m| {
+                    let mut m = m.borrow_mut();
+                    if m.len() > 1 << 14 {
+                        m.clear();
+                    }
+                    m.insert(key, std::rc::Rc::new((pl.sum.clone(), pl.invert, created)));
+                });
             }
         }
         let n = pl.sum.len();
@@ -287,6 +297,80 @@ impl Planner<'_> {
         }
         Ok(())
     }
+
+    /// Foldback factoring of `pl.sum` down to the free PTs (and of the other polarity if that
+    /// factors better); the foldbacks it creates go to `created`.
+    fn factor_sum(
+        &self,
+        pl: &mut PtPlan,
+        as_is: &Cover,
+        flipped: &Cover,
+        free: &[usize],
+        created: &mut Vec<(String, Vec<(Signal, bool)>)>,
+    ) {
+        let mut factor = |mut s: Cover| {
+            while s.len() > free.len() {
+                match factor_with_foldback(&s) {
+                    Some((x, key, fold)) => {
+                        created.push((key, fold));
+                        s = x
+                    }
+                    None => break,
+                }
+            }
+            s
+        };
+        // factor the chosen polarity; if it still does not fit, the other polarity may
+        // factor better (`L&a&(b+c+!d) + ...` has a larger cover but a common cube)
+        let mine = factor(pl.sum.clone());
+        let other_cover = if pl.invert { as_is.clone() } else { flipped.clone() };
+        if !pl.xor && mine.len() > free.len() && !other_cover.is_empty() && other_cover.len() < 99 && !Sop(other_cover.clone()).is_one() {
+            let other = factor(other_cover);
+            if other.len() < mine.len() {
+                pl.sum = other;
+                pl.invert = !pl.invert;
+            } else {
+                pl.sum = mine;
+            }
+        } else {
+            pl.sum = mine;
+        }
+    }
+}
+
+/// A cell's two covers and the polarity planning chooses (`Planner::choose_polarity`).
+struct Polarity {
+    as_is: Cover,
+    flipped: Cover,
+    sum: Cover,
+    invert: bool,
+    constant: Option<bool>,
+}
+
+/// One factoring result: the sum, its polarity, and the foldbacks it created.
+type Factored = std::rc::Rc<(Cover, bool, Vec<(String, Vec<(Signal, bool)>)>)>;
+
+thread_local! {
+    static POLARITY: std::cell::RefCell<rustc_hash::FxHashMap<(Sop, bool), std::rc::Rc<Polarity>>> = Default::default();
+    static FACTORED: std::cell::RefCell<rustc_hash::FxHashMap<(Sop, bool, bool, bool, usize), Factored>> = Default::default();
+}
+
+/// [`Planner::choose_polarity`] memoised per thread by the cell's cover and polarity (failures,
+/// which end the attempt, are not kept).
+fn polarity_memo(c: &Cell, f: impl FnOnce() -> Result<Polarity, FitError>) -> Result<std::rc::Rc<Polarity>, FitError> {
+    let key = (c.data.clone(), c.active_low);
+    if let Some(p) = POLARITY.with(|m| m.borrow().get(&key).cloned()) {
+        return Ok(p);
+    }
+    let p = std::rc::Rc::new(f()?);
+    POLARITY.with(|m| {
+        let mut m = m.borrow_mut();
+        if m.len() > 1 << 14 {
+            m.clear();
+        }
+        m.insert(key, p.clone());
+    });
+    Ok(p)
 }
 
 /// A cover with a negated foldback literal: foldback lines exist in one polarity only.
@@ -373,6 +457,27 @@ fn reserve_cascade_helpers(
 /// literals; replace those products by `literal & FOLD(product of the negated remainders)`.
 /// Returns the new sum, and the foldback it uses (name, product) for the caller's [`FoldTable`].
 pub(crate) fn factor_with_foldback(sum: &[Vec<(Signal, bool)>]) -> Option<(Vec<Vec<(Signal, bool)>>, String, Vec<(Signal, bool)>)> {
+    // a pure function of the cover, asked again for the same covers in every attempt of every
+    // strategy: memoised per thread (like the logic module's complement and minimisation)
+    type Step = Option<(Vec<Vec<(Signal, bool)>>, String, Vec<(Signal, bool)>)>;
+    thread_local! {
+        static MEMO: std::cell::RefCell<rustc_hash::FxHashMap<Vec<Vec<(Signal, bool)>>, Step>> = Default::default();
+    }
+    if let Some(r) = MEMO.with(|m| m.borrow().get(sum).cloned()) {
+        return r;
+    }
+    let r = factor_with_foldback_step(sum);
+    MEMO.with(|m| {
+        let mut m = m.borrow_mut();
+        if m.len() > 1 << 14 {
+            m.clear();
+        }
+        m.insert(sum.to_vec(), r.clone());
+    });
+    r
+}
+
+fn factor_with_foldback_step(sum: &[Vec<(Signal, bool)>]) -> Option<(Vec<Vec<(Signal, bool)>>, String, Vec<(Signal, bool)>)> {
     // De Morgan factoring with the block's foldback NAND terms: products that share a common
     // cube C and differ in one further literal each, `C&r1 # C&r2 # ... # C&rk`, are
     // `C & (r1 + ... + rk)` = `C & !(!r1 & ... & !rk)`: one foldback PT (the NAND) replaces k
