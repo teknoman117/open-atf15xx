@@ -107,6 +107,34 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-27** (main session) — Long-tail run times (user goal: no 30 s+ runs if avoidable;
+  designs that cannot fit fail fast). Each fix measured on the slow cases, then the whole set:
+  * `factor_with_foldback`: one pass groups the products by "product minus one literal" (hash
+    map) instead of scanning every candidate against every product; same groups, same tie order;
+    randomized test against the old step (`one_pass_factoring_equals_the_reference`, 3,000 covers).
+  * `opt::flatten` (toggle recovery): a cover cannot have less support than its function, so when
+    the fully substituted D depends on more than `MAX_SUPPORT` signals the substitution is bound to
+    fail: `support_exceeds` says so first (structural leaves as the cheap upper bound, then the
+    exact support from a BDD in depth-first variable order, given up beyond 50,000 nodes; a sorted
+    order made a 36-bit comparator's BDD explode in the first attempt). 68-bit accumulator: pass
+    14.4 → 8.1 s.
+  * `logic::merge` expansion checks only the other half of a cube (it is inside the function
+    already), `irredundant` no longer copies the cover per cube, `complement_within` reuses its
+    plain expansion.
+  * `split_large` asks `Sop::complement_if_smaller(n)`: the same cover as `complement_within`
+    whenever it answers, but it stops at 64 raw cubes per product of the cover (a 12-way mux bit's
+    complement has 4,096 products; 1.4 s each to find out it is not smaller): split pass 11 →
+    0.03 s.
+  * UIM repairs: the 404-fit edge sweep (repair log now with the first and best failing-block
+    need) showed no rescue when the first failing block needed 60 inputs or more (0 of 21), one
+    rescue above 44 (54 inputs, after 1 repair) and at most 38 stale repairs before a rescue at
+    43 or fewer; repairs now stop at >= 60, and above 44 after 8 stale repairs. Fits found by a
+    later *strategy* after a hopeless one exist (10-way mux: 64, then a fit), so the strategy
+    search itself is not cut.
+  Results: tests 61/61; corpus, examples, all 12,624 vendor designs, the benchmark's JEDs and
+  results and all 146 stored-netlist refits byte-identical. Benchmark 397.5 → 163.7 s; refits
+  443 → 268 s (36-bit compare gates 120 → 67 s, 12-way mux words 41 → 16.5 s, 68-bit accumulator
+  gates 31 → 14.5 s).
 * **2026-11-27** (main session) — Repair-loop cost (user request: fix the 20-bit compare's
   slowdown; no multicore unless it wins). Measured on the 20-bit compare's gate mapping (fails
   either way; 83.6 s single-threaded): (1) strategies 0/3/4 and 1/2 handed the fitter identical

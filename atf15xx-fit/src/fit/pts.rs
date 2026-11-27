@@ -485,32 +485,34 @@ fn factor_with_foldback_step(sum: &[Vec<(Signal, bool)>]) -> Option<(Vec<Vec<(Si
     // is any common cube (including the empty cube: a plain OR of literals). The grouping that
     // removes the most products wins; ties prefer the vendor's |C| = 1 form.
     let no_fold = |p: &Vec<(Signal, bool)>| p.iter().all(|(s, _)| !matches!(s, Signal::Fold(_)));
-    // candidate cubes: each product minus one literal
-    let mut cands: Vec<Vec<(Signal, bool)>> = vec![];
-    for p in sum.iter().filter(|p| no_fold(p)) {
+    // candidate cubes: each product minus one literal, with the products it comes from (a
+    // product contains the cube and one more literal exactly when the cube comes from it), in
+    // one pass; the best group as before: most products, then the single-literal cube, the
+    // first in cube order on a tie
+    let mut groups: rustc_hash::FxHashMap<Vec<(Signal, bool)>, Vec<usize>> = Default::default();
+    for (pi, p) in sum.iter().enumerate().filter(|(_, p)| no_fold(p)) {
         for i in 0..p.len() {
             let mut c = p.clone();
             c.remove(i);
             c.sort();
-            cands.push(c);
+            let g = groups.entry(c).or_default();
+            if g.last() != Some(&pi) {
+                g.push(pi);
+            }
         }
     }
-    cands.sort();
-    cands.dedup();
     let mut best: Option<(Vec<(Signal, bool)>, Vec<usize>, (usize, bool))> = None;
-    for c in cands {
-        let members: Vec<usize> = sum
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| no_fold(p) && p.len() == c.len() + 1 && c.iter().all(|l| p.contains(l)))
-            .map(|(i, _)| i)
-            .collect();
+    for (c, members) in groups {
         if members.len() < 2 {
             continue;
         }
         // k products become one: saving k - 1; prefer the vendor's single-literal common cube
         let score = (members.len() - 1, c.len() == 1);
-        if best.as_ref().map_or(true, |b| score > b.2) {
+        let better = match &best {
+            None => true,
+            Some((bc, _, bs)) => score > *bs || (score == *bs && c < *bc),
+        };
+        if better {
             best = Some((c, members, score));
         }
     }
@@ -570,6 +572,86 @@ pub(super) fn one_product(s: &Sop, cell: &str, what: &str, folds: &mut FoldTable
             } else {
                 err(FitErrorKind::Other, format!("{cell}: {what} needs more than one product term ({} products: {})", m.0.len(), m))
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The factoring step before 2026-11-27 (candidates scanned against every product), kept as
+    /// the reference of the one-pass version.
+    fn reference_step(sum: &[Vec<(Signal, bool)>]) -> Option<(Vec<Vec<(Signal, bool)>>, String, Vec<(Signal, bool)>)> {
+        let no_fold = |p: &Vec<(Signal, bool)>| p.iter().all(|(s, _)| !matches!(s, Signal::Fold(_)));
+        let mut cands: Vec<Vec<(Signal, bool)>> = vec![];
+        for p in sum.iter().filter(|p| no_fold(p)) {
+            for i in 0..p.len() {
+                let mut c = p.clone();
+                c.remove(i);
+                c.sort();
+                cands.push(c);
+            }
+        }
+        cands.sort();
+        cands.dedup();
+        let mut best: Option<(Vec<(Signal, bool)>, Vec<usize>, (usize, bool))> = None;
+        for c in cands {
+            let members: Vec<usize> = sum
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| no_fold(p) && p.len() == c.len() + 1 && c.iter().all(|l| p.contains(l)))
+                .map(|(i, _)| i)
+                .collect();
+            if members.len() < 2 {
+                continue;
+            }
+            let score = (members.len() - 1, c.len() == 1);
+            if best.as_ref().map_or(true, |b| score > b.2) {
+                best = Some((c, members, score));
+            }
+        }
+        let (c, members, _) = best?;
+        let mut fold: Vec<(Signal, bool)> =
+            members.iter().map(|&i| sum[i].iter().find(|x| !c.contains(x)).cloned().map(|(s, p)| (s, !p)).unwrap()).collect();
+        fold.sort();
+        fold.dedup();
+        if fold.windows(2).any(|w| w[0].0 == w[1].0) {
+            return None;
+        }
+        let key = fold.iter().map(|(s, p)| format!("{}{}", if *p { "" } else { "!" }, s)).collect::<Vec<_>>().join("&");
+        let mut out: Vec<Vec<(Signal, bool)>> =
+            sum.iter().enumerate().filter(|(i, _)| !members.contains(i)).map(|(_, p)| p.clone()).collect();
+        let mut np = c;
+        np.push((Signal::Fold(key.clone()), true));
+        np.sort();
+        out.push(np);
+        Some((out, key, fold))
+    }
+
+    #[test]
+    fn one_pass_factoring_equals_the_reference() {
+        use rand::{Rng, SeedableRng};
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
+        let sig = |i: usize| Signal::Pad(format!("s{i}"));
+        for _ in 0..3000 {
+            let nvars = rng.random_range(2..9);
+            let n = rng.random_range(1..14);
+            let mut sum: Vec<Vec<(Signal, bool)>> = vec![];
+            for _ in 0..n {
+                let mut p: Vec<(Signal, bool)> = vec![];
+                for v in 0..nvars {
+                    if rng.random_bool(0.5) {
+                        p.push((sig(v), rng.random_bool(0.5)));
+                    }
+                }
+                p.sort();
+                sum.push(p);
+            }
+            if rng.random_bool(0.2) {
+                sum.push(vec![(Signal::Fold("f".into()), true)]); // a product already using a foldback
+            }
+            assert_eq!(factor_with_foldback_step(&sum), reference_step(&sum), "{sum:?}");
         }
     }
 }

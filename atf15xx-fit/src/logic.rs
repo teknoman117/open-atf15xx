@@ -172,6 +172,25 @@ impl Sop {
     /// callers that only ask whether the complement is *cheaper* (a function whose complement
     /// needs that many cubes is not). Within [`PLAIN_COMPLEMENT_LIMIT`] the result is exactly
     /// [`Sop::complement`]'s; functions of more than 64 signals return None.
+    /// [`Sop::complement_within`] for the question "is the other polarity smaller than `n`
+    /// products?": the same cover when it answers, but it gives up (None: not smaller) as soon as
+    /// the expansion passes 64 raw cubes per product of `n`, where `complement_within` would go on
+    /// to 4,096 plain and 16,384 folded cubes (a 12-way mux's complement has 4,096 products; its
+    /// cover has 12).
+    pub fn complement_if_smaller(&self, n: usize, max_cubes: usize) -> Option<Sop> {
+        let small = 64 * n.max(1);
+        let (vars, cover) = self.encode();
+        let c = cover?;
+        let mut budget = small.min(PLAIN_COMPLEMENT_LIMIT);
+        let r = match complement_plain(&c, vars.len(), &mut budget) {
+            Some(raw) => memo(&COMPLEMENT, self, || decode(&vars, &irredundant(&merge(raw)))),
+            // complement_within goes on with the plain expansion up to its limit: give up here
+            None if small < PLAIN_COMPLEMENT_LIMIT => return None,
+            None => decode(&vars, &irredundant(&merge(complement_folded_within(&c, vars.len(), max_cubes.min(small))?))),
+        };
+        (r.0.len() < n).then_some(r)
+    }
+
     pub fn complement_within(&self, max_cubes: usize) -> Option<Sop> {
         // memoised per thread like the others: the fitter asks again in every attempt
         thread_local! {
@@ -185,8 +204,9 @@ impl Sop {
             let (vars, cover) = self.encode();
             let c = cover?;
             let mut budget = PLAIN_COMPLEMENT_LIMIT;
-            if complement_plain(&c, vars.len(), &mut budget).is_some() {
-                return Some(self.complement());
+            if let Some(raw) = complement_plain(&c, vars.len(), &mut budget) {
+                // what `complement()` computes from the same expansion (it would run it again)
+                return Some(memo(&COMPLEMENT, self, || decode(&vars, &irredundant(&merge(raw)))));
             }
             let raw = complement_folded_within(&c, vars.len(), max_cubes)?;
             Some(decode(&vars, &irredundant(&merge(raw))))
@@ -611,9 +631,12 @@ fn merge(c: Vec<Cube>) -> Vec<Cube> {
                     if c[k].care & b == 0 {
                         continue;
                     }
-                    let e = Cube { care: c[k].care & !b, val: c[k].val & !b };
-                    if cube_in_cover(&e, &f) {
-                        c[k] = e;
+                    // c[k] lies inside the function (it is a cube of it, or an expansion that
+                    // was checked), so dropping literal b keeps it inside exactly when the other
+                    // half, c[k] with b flipped, lies inside: a check on a cube no larger than c[k]
+                    let half = Cube { care: c[k].care, val: c[k].val ^ b };
+                    if cube_in_cover(&half, &f) {
+                        c[k] = Cube { care: c[k].care & !b, val: c[k].val & !b };
                         changed = true;
                     }
                 }
@@ -682,9 +705,17 @@ fn merge_general(mut c: Vec<Cube>) -> Vec<Cube> {
 }
 
 fn cube_in_cover(x: &Cube, f: &[Cube]) -> bool {
+    cube_in_cover_except(x, f, usize::MAX)
+}
+
+/// [`cube_in_cover`] against `f` without its cube number `skip`.
+fn cube_in_cover_except(x: &Cube, f: &[Cube], skip: usize) -> bool {
     // f restricted to x is a tautology
     let mut cof: Vec<Cube> = vec![];
-    for y in f {
+    for (j, y) in f.iter().enumerate() {
+        if j == skip {
+            continue;
+        }
         if (y.val ^ x.val) & y.care & x.care != 0 {
             continue;
         }
@@ -699,8 +730,7 @@ fn irredundant(c: &[Cube]) -> Vec<Cube> {
     v.sort_by_key(|x| std::cmp::Reverse(x.lits()));
     let mut i = 0;
     while i < v.len() {
-        let rest: Vec<Cube> = v.iter().enumerate().filter(|(j, _)| *j != i).map(|(_, x)| *x).collect();
-        if cube_in_cover(&v[i], &rest) {
+        if cube_in_cover_except(&v[i], &v, i) {
             v.remove(i);
         } else {
             i += 1;

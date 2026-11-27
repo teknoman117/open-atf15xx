@@ -330,6 +330,13 @@ pub fn fit(family: Family, pla: &Pla, opts: &Options) -> Result<FitResult, FitEr
 /// Distinct UIM inputs a block can route to its product terms (all families).
 pub const UIM_INPUTS_PER_BLOCK: usize = 40;
 
+/// UIM repairs (`fit_design`): a failing block that needs this many inputs or more is not
+/// repaired at all; one that needs more than [`REPAIR_TIGHT`] gets at most
+/// [`REPAIR_TIGHT_STALE`] repairs without improving (spec F4.6, evidence in the work log).
+const REPAIR_HOPELESS: usize = 60;
+const REPAIR_TIGHT: usize = 44;
+const REPAIR_TIGHT_STALE: usize = 8;
+
 pub use crate::capacity::MAX_CHAIN_PTS;
 use crate::capacity::{factored_len, helper_slot, helpers_for, pt_demand, COMPLEMENT_CHOICE_CUBES, MAX_CHAIN_MCS, PTS_PER_MC};
 
@@ -379,14 +386,18 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
     // failing block needed so far, and the longest run of repairs without improving on it
     let (mut best_need, mut stale, mut max_stale) = (usize::MAX, 0usize, 0usize);
     let t_fit = std::time::Instant::now();
-    let log_repairs = |ok: bool, repairs: usize, max_stale: usize| {
+    // and the distinct inputs of the first failing block (the overflow the repairs start from)
+    let mut first_need: Option<usize> = None;
+    let log_repairs = |ok: bool, repairs: usize, max_stale: usize, first: Option<usize>, best: usize| {
         if let Some(path) = std::env::var_os("ATF_FIT_REPAIR_LOG") {
             use std::io::Write;
             if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
                 let _ = writeln!(
                     f,
-                    "{} repairs={repairs} max_stale={max_stale} s={:.2}",
+                    "{} repairs={repairs} max_stale={max_stale} first_need={} best_need={} s={:.2}",
                     if ok { "ok" } else { "fail" },
+                    first.map_or("-".into(), |n| n.to_string()),
+                    if best == usize::MAX { "-".into() } else { best.to_string() },
                     t_fit.elapsed().as_secs_f64()
                 );
             }
@@ -428,7 +439,7 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
             }
             match attempt {
                 Ok(r) => {
-                    log_repairs(true, repairs, max_stale);
+                    log_repairs(true, repairs, max_stale, first_need, best_need);
                     return Ok(r);
                 }
                 Err(e) if e.kind() == FitErrorKind::Routing && e.msg.contains("[movable: ") && repairs < 96 => {
@@ -439,12 +450,22 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
                         .and_then(|x| x.split(' ').next())
                         .and_then(|x| x.parse::<usize>().ok())
                         .unwrap_or(usize::MAX);
+                    first_need.get_or_insert(need);
                     if need < best_need {
                         best_need = need;
                         stale = 0;
                     } else {
                         stale += 1;
                         max_stale = max_stale.max(stale);
+                    }
+                    // a block far over its 40 inputs is not rescued one node at a time
+                    // (measured over the 404 edge-sweep fits, 2026-11-27: of 21 fits whose first
+                    // failing block needed 60 or more, none fitted after repairs; above 44, the
+                    // one rescue took a single repair; at most 38 repairs without progress
+                    // preceded a rescue at 43 or fewer)
+                    if best_need >= REPAIR_HOPELESS || (best_need > REPAIR_TIGHT && stale >= REPAIR_TIGHT_STALE) {
+                        last = Some(e);
+                        continue;
                     }
                     // move one floating node out of the congested block and try again
                     let blk = e.msg.split("block ").nth(1).and_then(|x| x.chars().next()).unwrap();
@@ -488,7 +509,7 @@ pub fn fit_design(dev: &'static Device, design: Design, opts: &Options) -> Resul
             None => break,
         }
     }
-    log_repairs(false, repairs, max_stale);
+    log_repairs(false, repairs, max_stale, first_need, best_need);
     Err(last.unwrap())
 }
 

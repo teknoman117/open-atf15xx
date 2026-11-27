@@ -51,8 +51,8 @@ pub fn split_large(d: &mut Design, max_products: usize) -> usize {
         let c = &d.cells[i];
         if cost(&c.data) > limit {
             // work in the cheaper polarity (a complement too large to compute is not cheaper)
-            let (mut data, flip) = match c.data.complement_within(SPLIT_COMPLEMENT_CUBES) {
-                Some(comp) if comp.0.len() < c.data.0.len() => (comp, true),
+            let (mut data, flip) = match c.data.complement_if_smaller(c.data.0.len(), SPLIT_COMPLEMENT_CUBES) {
+                Some(comp) => (comp, true),
                 _ => (c.data.minimize(), false),
             };
             let base = c.name.clone();
@@ -404,7 +404,97 @@ fn bdd_toggle(d: &Design, c: &Cell, max: usize) -> Option<Sop> {
     net.cover(&t, max)
 }
 
+/// Whether `f`, with the combinatorial nodes substituted, depends on more than `max` signals:
+/// the leaves (an upper bound) first; then, only if there are more than `max`, the exact support
+/// from a BDD whose variables follow a depth-first visit of the logic (interleaving the bits of
+/// comparators and carry chains, where a sorted order is exponential), given up (false) beyond
+/// [`SUPPORT_BDD_NODES`] nodes.
+fn support_exceeds(d: &Design, f: &Sop, max: usize) -> bool {
+    let mut order: Vec<Signal> = vec![];
+    let mut seen_leaf: std::collections::BTreeSet<Signal> = Default::default();
+    let mut seen_node: std::collections::BTreeSet<String> = Default::default();
+    // depth-first, products and literals in order
+    fn visit(
+        d: &Design,
+        f: &Sop,
+        order: &mut Vec<Signal>,
+        leaves: &mut std::collections::BTreeSet<Signal>,
+        nodes: &mut std::collections::BTreeSet<String>,
+    ) {
+        for p in &f.0 {
+            for (s, _) in p {
+                match substitutable(d, s) {
+                    Some(c) => {
+                        if nodes.insert(c.name.clone()) {
+                            visit(d, &c.data, order, leaves, nodes);
+                        }
+                    }
+                    None => {
+                        if leaves.insert(s.clone()) {
+                            order.push(s.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    visit(d, f, &mut order, &mut seen_leaf, &mut seen_node);
+    if order.len() <= max || order.len() > 512 {
+        return false;
+    }
+    let vars = biodivine_lib_bdd::BddVariableSet::new_anonymous(order.len() as u16);
+    let var_of: std::collections::BTreeMap<Signal, biodivine_lib_bdd::BddVariable> = order.iter().cloned().zip(vars.variables()).collect();
+    let mut memo: std::collections::BTreeMap<String, biodivine_lib_bdd::Bdd> = Default::default();
+    fn build(
+        d: &Design,
+        f: &Sop,
+        vars: &biodivine_lib_bdd::BddVariableSet,
+        var_of: &std::collections::BTreeMap<Signal, biodivine_lib_bdd::BddVariable>,
+        memo: &mut std::collections::BTreeMap<String, biodivine_lib_bdd::Bdd>,
+    ) -> Option<biodivine_lib_bdd::Bdd> {
+        let mut acc = vars.mk_false();
+        for p in &f.0 {
+            let mut t = vars.mk_true();
+            for (s, pos) in p {
+                let b = match substitutable(d, s) {
+                    Some(c) => match memo.get(&c.name) {
+                        Some(b) => b.clone(),
+                        None => {
+                            let mut b = build(d, &c.data, vars, var_of, memo)?;
+                            if c.active_low {
+                                b = b.not();
+                            }
+                            memo.insert(c.name.clone(), b.clone());
+                            b
+                        }
+                    },
+                    None => vars.mk_var(var_of[s]),
+                };
+                t = t.and(&if *pos { b } else { b.not() });
+                if t.size() > SUPPORT_BDD_NODES {
+                    return None;
+                }
+            }
+            acc = acc.or(&t);
+            if acc.size() > SUPPORT_BDD_NODES {
+                return None;
+            }
+        }
+        Some(acc)
+    }
+    build(d, f, &vars, &var_of, &mut memo).is_some_and(|b| b.support_set().len() > max)
+}
+
+/// The size at which [`support_exceeds`] gives up on its BDD.
+const SUPPORT_BDD_NODES: usize = 50_000;
+
 fn flatten(d: &Design, f: &Sop, budget: usize) -> Option<Sop> {
+    // a cover can never have less support than the function it is: when the fully substituted
+    // function depends on more than MAX_SUPPORT signals, the substitution below is bound to fail
+    // (at the latest after its last node), so say so at once (see support_exceeds)
+    if f.signals().iter().any(|s| substitutable(d, s).is_some()) && support_exceeds(d, f, MAX_SUPPORT) {
+        return None;
+    }
     let mut f = f.clone();
     for _ in 0..64 {
         let node = f.signals().into_iter().find_map(|s| match &s {
