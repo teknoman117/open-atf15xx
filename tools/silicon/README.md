@@ -7,6 +7,7 @@ board: <https://github.com/teknoman117/breakout-atf1508as>). OpenOCD 0.12 on the
 | tool | what it does |
 |---|---|
 | `jtag_guard.py --jed X.jed --svf X.svf` | refuses (exit 1) any image that would disable JTAG: JED special bit 1 (fuse 16783/34167/74115 for 1502/1504/1508) must be 1, and every special-register write in the SVF (`SIR 10 TDI (292)` + `SDR 4`) must have bit 2 set |
+| `atf15xx-tool jtag-guard --jed X.jed --svf X.svf` | the same guard in Rust (on the `svf` and `jedec` readers; `program.sh` uses it when built); verdicts identical to `jtag_guard.py` on every committed vector |
 | `program.sh X.svf [X.jed] [idcode]` | runs the guard, then plays the SVF with OpenOCD (`-irlen 10`, 400 kHz, IDCODE default `0x0150803f` = ATF1508AS) |
 
 ```

@@ -165,8 +165,9 @@ the CLI (F9.7), the typed netlist IR (F9.7 item 1), typed fit errors (F9.9), pro
 4. **Canonical cell order** for the plugin: results there still depend on the path a source was
    read by (Yosys orders cells by path-carrying names, F9.7); the CLI avoids it by reading
    relative paths.
-5. **Crate hygiene** (plan §5): `jedec` crate for reading (verified identical on 134 JEDs),
-   `bitvec`, `thiserror`, an `svf` parser in tests.
+5. **Crate hygiene** (plan §5), done 2026-11-27 except: `Result<_, String>` in the library crates
+   (typed errors where a caller needs to tell failures apart), and an upstream fix for `jedec`
+   0.1.0's default-only files (worked around in `atf15xx_sim::parse_jed_bytes`).
 6. **Cascade follow-ups** (F4.3, `tools/fuzzers/fitter-cascade`): the vendor's input placement
    order (it places the data inputs of the cascade designs as D1…D5, D0), so that chained designs
    become fuse-identical; 30-term sums fail our UIM routing where the vendor fits; wide cells that

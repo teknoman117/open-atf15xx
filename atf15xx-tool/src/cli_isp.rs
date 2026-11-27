@@ -20,6 +20,15 @@ pub enum Cmd {
     /// Inspect JEDEC files.
     #[command(subcommand)]
     Jed(JedCmd),
+    /// Refuse an image that would disable JTAG (its pins become I/O; recovery needs 12 V on OE1):
+    /// exit 0 if the JED's JTAG-enable fuse and every special-register write of the SVF keep it,
+    /// 1 if not (or if it cannot tell).
+    JtagGuard {
+        #[arg(long)]
+        jed: Option<PathBuf>,
+        #[arg(long)]
+        svf: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -122,6 +131,49 @@ pub fn run(cmd: Cmd) -> Result<(), Error> {
         Cmd::Chain(ChainCmd::Show { chain, paths }) => cmd_chain_show(&chain, &paths),
         Cmd::Chain(ChainCmd::Create { devices, output, calibration }) => cmd_chain_create(&devices, &output, calibration),
         Cmd::Jed(JedCmd::Info { file }) => cmd_jed_info(&file),
+        Cmd::JtagGuard { jed, svf } => cmd_jtag_guard(jed.as_deref(), svf.as_deref()),
+    }
+}
+
+/// `jtag-guard` (the port of `tools/silicon/jtag_guard.py`).
+fn cmd_jtag_guard(jed: Option<&Path>, svf: Option<&Path>) -> Result<(), Error> {
+    use atf15xx_tool::guard;
+    if jed.is_none() && svf.is_none() {
+        return Err(usage("give --jed and/or --svf"));
+    }
+    let read = |p: &Path| std::fs::read(p).map_err(|e| Error::Input(format!("cannot read {}: {e}", p.display())));
+    let verdict = |keeps: bool| if keeps { "JTAG stays ENABLED" } else { "JTAG would be DISABLED" };
+    let mut ok = true;
+    if let Some(p) = jed {
+        match guard::jed_keeps_jtag(&read(p)?) {
+            Ok(k) => {
+                println!("jtag-guard: {}: JTAG-enable fuse -> {}", p.display(), verdict(k));
+                ok &= k;
+            }
+            Err(e) => {
+                println!("jtag-guard: {}: {e} -- refusing", p.display());
+                ok = false;
+            }
+        }
+    }
+    if let Some(p) = svf {
+        let text: String = read(p)?.iter().map(|&b| b as char).collect();
+        match guard::svf_special_writes(&text).and_then(|w| guard::svf_keeps_jtag(&text).map(|k| (w, k))) {
+            Ok((w, k)) => {
+                let list: Vec<String> = w.iter().map(|x| format!("{x:x}")).collect();
+                println!("jtag-guard: {}: {} special-register write(s) {} -> {}", p.display(), w.len(), list.join(" "), verdict(k));
+                ok &= k;
+            }
+            Err(e) => {
+                println!("jtag-guard: {}: {e} -- refusing", p.display());
+                ok = false;
+            }
+        }
+    }
+    if ok {
+        Ok(())
+    } else {
+        Err(Error::Input("the image would disable JTAG, or the guard cannot tell".into()))
     }
 }
 

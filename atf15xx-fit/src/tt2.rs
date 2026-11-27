@@ -30,15 +30,10 @@ pub struct Pla {
     pub cubes: Vec<(Vec<Option<bool>>, Vec<usize>)>,
 }
 
-#[derive(Debug)]
+/// A `.tt2` syntax error: line number and message.
+#[derive(Debug, thiserror::Error)]
+#[error("line {0}: {1}")]
 pub struct ParseError(pub usize, pub String);
-
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "line {}: {}", self.0, self.1)
-    }
-}
-impl std::error::Error for ParseError {}
 
 fn decl(tok: &str) -> (String, bool, Option<u16>) {
     let (n, num) = match tok.split_once(':') {

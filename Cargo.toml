@@ -30,6 +30,9 @@ bsdl = "0.1.1"
 vcd = "0.7"
 # BDDs for exact Boolean analysis where SOP flattening explodes (toggle recovery through carry networks)
 biodivine-lib-bdd = "0.6"
+jedec = "0.1"
+svf = "0.3"
+thiserror = "2"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 clap = { version = "4.6", features = ["derive"] }
 flate2 = "1.1.11"

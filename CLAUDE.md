@@ -109,7 +109,7 @@ tools/sim/run.sh python3 tools/sim/equiv.py out/design.jed --device P1504C44 \
 - Never program an image that disables JTAG (anything built with `jtag off`; JED special bit 1 = 0):
   recovery needs 12 V on OE1. Use `tools/silicon/program.sh`, which refuses such images. The
   user-facing `atf15xx-tool program` only warns (by design: designs may need those pins), so check
-  the image (`tools/silicon/jtag_guard.py`) before programming with it.
+  the image (`atf15xx-tool jtag-guard --jed X.jed`, or `tools/silicon/jtag_guard.py`) before programming with it.
 - Never program fuzzing JEDEC files into a device.
 - Only one wine job at a time per prefix: check `pgrep -fa 'wine|ATMISP|fit15|drive.exe'` first.
 

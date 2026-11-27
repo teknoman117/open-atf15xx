@@ -147,20 +147,14 @@ impl Default for Options {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[error("{msg}")]
 pub struct FitError {
     /// What the failure is about, set where it is raised (spec F9.11).
     pub kind: FitErrorKind,
     /// The message for the user.
     pub msg: String,
 }
-
-impl std::fmt::Display for FitError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.msg)
-    }
-}
-impl std::error::Error for FitError {}
 
 /// What a fit failure is about (spec F9.11): lets callers prune their search instead of
 /// matching message text.

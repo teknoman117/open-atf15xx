@@ -7,5 +7,6 @@
    "jed": null
   }
  ],
- "expect": "ok"
+ "expect": "ok",
+ "svf_parse_defect": "ATMISP writes the 9-bit SDR value as `00 (a backtick for the top hex digit); reproduced byte for byte, so the svf crate rejects it"
 }

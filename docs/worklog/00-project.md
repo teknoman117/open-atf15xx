@@ -87,6 +87,26 @@ prjbureau study: `docs/prjbureau/`; work logs: `docs/worklog/`; tooling: `tools/
 
 ## Journal
 
+* **2026-11-27** (main session) — Upstream crates (user request: "select upstream crates where
+  they make sense (jedec, svf, etc.); ensure regression tests exist"). **`jedec`** 0.1.0 (0BSD)
+  is the one JEDEC reader of fit and sim (`atf15xx_sim::parse_jed_bytes`; `atf15xx_fit::jed::parse`
+  wraps it): same fuses as the old readers on all 17,318 JEDs in `.scratch` (vendor and ours),
+  regression test with the old reader as reference over every committed JED. It is stricter (STX,
+  ETX, file checksum, a right `C`): ATMISP's quirk inputs `C0000`, `X` digits and CR-in-address
+  are refused (ATMISP's own reading stays in `atf15xx-tool`'s `isp::jedec`). `jedec` fails on a
+  file with only `QF` + `F`; worked around (re-read with a no-op `L0`), tested. **`svf`** 0.3.0
+  (MIT): every SVF the 145 ATMISP vectors generate must parse (4 reproduce ATMISP's backtick
+  defect, recorded in `case.json`); the JTAG guard is ported to Rust on it (`atf15xx-tool
+  jtag-guard`, `atf15xx_tool::guard`), tested against an independent fuse reading (`jedec` +
+  `atf15xx-arch`'s address) and against ATMISP's SVFs, verdicts identical to
+  `tools/silicon/jtag_guard.py` on 132 SVFs and 95 JEDs; `program.sh` prefers it; `atf15xx-tool
+  program` refuses to play an SVF whose special-register writes disagree with the JED's fuse.
+  **`thiserror`** 2: the three hand-written error types derive it (messages pinned by tests).
+  **`bitvec`**: not adopted (reasons in `docs/plan/open-source.md` §5). Checks: tests 59/59, corpus
+  and examples byte-identical, all 12,624 vendor designs byte-identical, plugin builds. A test of
+  the guard first assumed the three `*_nojtag_*` conformance vectors disable JTAG; they were
+  fitted with `-JTAG on -JTAG off` and keep it (all readers agree), so the test now reads the
+  fuse independently instead of guessing from the arguments.
 - **2026-11-25**: Release 0.1.0 (user request): the workspace version is 0.1.0 and `main` is one
   commit, tagged `v0.1.0`. Licence: ISC (user decision: "the same that yosys and nextpnr use"; was
   MIT OR Apache-2.0); the examples ported from the user's MPL-2.0 CUPL sources are relicensed ISC too (user request). `examples/shift-register` added (user request): the

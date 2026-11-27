@@ -1,5 +1,5 @@
-//! Fuse arrays and JEDEC files: a region-structured writer (`write`) and a reader (`parse`) that
-//! accepts any JESD3 fuse file, including the vendor fitters' and ATMISP's.
+//! Fuse arrays and JEDEC files: a region-structured writer (`write`) and the shared reader
+//! (`parse`, on the `jedec` crate) for any JESD3 fuse file, including the vendor fitters' and ATMISP's.
 
 use atf15xx_arch::{block_letter, Family};
 use std::fmt::Write as _;
@@ -52,48 +52,11 @@ impl Fuses {
     }
 }
 
-/// Parse any JEDEC file (fields are `*`-terminated; `L` fields override the `F` default).
+/// Read a JEDEC file (JESD3-C; the shared reader [`atf15xx_sim::parse_jed`], on the `jedec`
+/// crate): the vendor fitters', ATMISP's and ours.
 pub fn parse(text: &str) -> Result<Fuses, String> {
-    let body = text.split('\x02').nth(1).unwrap_or(text);
-    let body = body.split('\x03').next().unwrap_or(body);
-    let mut fields = body.split('*').map(str::trim);
-    fields.next(); // design specification (header text)
-    let mut qf = None;
-    let mut default = false;
-    let mut security = false;
-    let mut ls: Vec<(usize, String)> = vec![];
-    let mut device = None;
-    for f in fields {
-        if let Some(n) = f.strip_prefix("QF") {
-            qf = Some(n.trim().parse::<usize>().map_err(|e| e.to_string())?);
-        } else if f == "F0" || f == "F1" {
-            default = f == "F1";
-        } else if f == "G1" {
-            security = true;
-        } else if let Some(rest) = f.strip_prefix('L') {
-            let mut it = rest.splitn(2, |c: char| c.is_whitespace());
-            let a: usize = it.next().unwrap_or("").parse().map_err(|e: std::num::ParseIntError| e.to_string())?;
-            let bits: String = it.next().unwrap_or("").chars().filter(|c| *c == '0' || *c == '1').collect();
-            ls.push((a, bits));
-        }
-    }
-    for tag in ["JEDEC file for: ATF", "JEDEC fuse map for ATF"] {
-        if let Some(i) = text.find(tag) {
-            device = text.get(i + tag.len()..i + tag.len() + 4).and_then(Family::from_number);
-        }
-    }
-    let qf = qf.ok_or("no QF field")?;
-    let family = device
-        .filter(|f| f.fuse_count() == qf)
-        .or_else(|| Family::ALL.into_iter().find(|f| f.fuse_count() == qf))
-        .ok_or("unknown device")?;
-    let mut fz = Fuses { family, bits: vec![default; qf], security };
-    for (a, bits) in ls {
-        for (i, c) in bits.chars().enumerate() {
-            fz.bits[a + i] = c == '1';
-        }
-    }
-    Ok(fz)
+    let f = atf15xx_sim::parse_jed(text).map_err(|e| format!("{e:#}"))?;
+    Ok(Fuses { family: f.family, bits: f.bits, security: f.security })
 }
 
 /// Write the fuse array as a JEDEC file (JESD3-C), one `L` field per fuse-map item, in address

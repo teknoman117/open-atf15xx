@@ -106,7 +106,7 @@ fn flipping_used_fuses_changes_behaviour() {
 fn parse_jed_rejects_bad_input() {
     assert!(atf15xx_sim::parse_jed("\x02*QF123*F0*\x03").is_err());
     assert!(atf15xx_sim::parse_jed("\x02*F0*\x03").is_err());
-    let ok = atf15xx_sim::parse_jed("\x02*QF34192*F0*L0 11*\x03").unwrap();
+    let ok = atf15xx_sim::parse_jed("\x02*QF34192*F0*L0 11*\x030000").unwrap();
     assert_eq!(ok.bits.len(), 34192);
     assert!(ok.bits[0] && ok.bits[1] && !ok.bits[2]);
 }

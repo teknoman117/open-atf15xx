@@ -391,6 +391,12 @@ fn check_length<J: atf15xx_tool::dbg::Jtag>(scan: &mut Scanner<J>) -> Result<()>
 fn program(cfg: &OpenOcdConfig, part: &Part, jed: &std::path::Path, keep: Option<&std::path::Path>) -> Result<()> {
     let device = part.name.split('-').next().unwrap_or(&part.name);
     let (svf, jtag_on) = crate::cli_isp::program_svf(device, jed).map_err(|e| anyhow::anyhow!(e.to_string().replace('\n', " ")))?;
+    // the SVF about to be played must say the same as the JED (the guard reads its
+    // special-register writes with the `svf` crate)
+    let svf_says = atf15xx_tool::guard::svf_keeps_jtag(&String::from_utf8_lossy(&svf));
+    if svf_says != Ok(jtag_on) {
+        anyhow::bail!("internal: the generated SVF ({svf_says:?}) and the JED's JTAG fuse ({jtag_on}) disagree; not programming");
+    }
     if !jtag_on {
         eprintln!(
             "warning: {} disables the JTAG port: its pins become I/O, and after this the device can only be \

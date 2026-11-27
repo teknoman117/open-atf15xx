@@ -118,6 +118,16 @@ fn run_case(dir: &Path) -> Result<(), String> {
                     w.lines().nth(line)
                 ));
             }
+            // every SVF we write must also parse as SVF (the `svf` crate, an independent reader),
+            // except ATMISP's own defects, which we reproduce byte for byte
+            if let Err(e) = svf::parse_complete(&String::from_utf8_lossy(&out.svf)) {
+                let defect = meta.get("svf_parse_defect").and_then(|v| v.as_str());
+                if defect.is_none() {
+                    return Err(format!("written SVF does not parse: {e:?}"));
+                }
+            } else if let Some(d) = meta.get("svf_parse_defect").and_then(|v| v.as_str()) {
+                return Err(format!("SVF parses, but case.json records the defect {d:?}"));
+            }
             for (_, p, bytes) in &out.jedec_outputs {
                 let name = p.rsplit('\\').next().unwrap();
                 let exp = dir.join(format!("expected-{name}.gz"));

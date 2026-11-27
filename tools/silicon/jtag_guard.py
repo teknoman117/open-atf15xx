@@ -11,6 +11,10 @@ Checks, for a .jed and/or the .svf made from it:
     that fuse and diffing the atmisp SVF); the same layout is assumed for 1502/1504.
 Exit 0 = safe, 1 = would disable JTAG (or cannot tell), 2 = usage error.
 
+The Rust port is `atf15xx-tool jtag-guard` (atf15xx-tool/src/guard.rs, on the `svf` and `jedec`
+readers), which program.sh prefers; both give the same verdict on every committed vector
+(132 ATMISP SVFs and their JEDs, the 95 fitter conformance JEDs; 2026-11-27).
+
   usage: jtag_guard.py [--jed X.jed] [--svf X.svf]
 """
 import argparse, re, sys
