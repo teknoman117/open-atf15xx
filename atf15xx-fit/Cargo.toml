@@ -10,6 +10,9 @@ rustc-hash = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 atf15xx-arch = { workspace = true }
+atf15xx-sim = { workspace = true }
+biodivine-lib-bdd = { workspace = true }
+rayon = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

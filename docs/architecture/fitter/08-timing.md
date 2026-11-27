@@ -238,7 +238,7 @@ tsu      8           # worst input setup (ns)
 optimize area        # or speed
 ```
 
-**Selection** (`flow::judge` and `flow::fit_key`, shared by the strategy loop, the wide-compare
+**Selection** (`atf15xx_fit::search::judge` and `fit_key`, shared by the strategy loop, the wide-compare
 piece forms (F9.12) and `flow::better` across mappings):
 
 1. A fit that meets every target beats one that does not, **whatever it costs in macrocells**.

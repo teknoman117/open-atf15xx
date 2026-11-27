@@ -1,14 +1,14 @@
 //! Netlist optimisations between the Yosys front end and the fitter (spec §F7.4).
 
-use atf15xx_fit::logic::{Signal, Sop};
-use atf15xx_fit::netlist::{Cell, Design, Storage};
+use crate::logic::{Signal, Sop};
+use crate::netlist::{Cell, Design, Storage};
 
 fn n_products(s: &Sop) -> usize {
     s.0.len()
 }
 
 /// Most distinct inputs a cell may get from inlining or analysis rewriting. A macrocell's PTs see
-/// only its block's 40 UIM inputs (`atf15xx_fit::fit::UIM_INPUTS_PER_BLOCK`); staying well below
+/// only its block's 40 UIM inputs (`crate::fit::UIM_INPUTS_PER_BLOCK`); staying well below
 /// leaves room for the other cells of the block, and keeps carry chains as buried nodes.
 pub const MAX_SUPPORT: usize = 32;
 

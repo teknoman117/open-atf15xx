@@ -24,9 +24,9 @@ written in our own layout.
 | crate | what |
 |---|---|
 | [`atf15xx-arch`](atf15xx-arch) | architecture and fuse-map database (oracle-derived), JED decoding |
-| [`atf15xx-fit`](atf15xx-fit) | fitter library: `.tt2` front end, netlist IR, placement, PT allocation, UIM routing, foldbacks, XOR synthesis, JED reader and writer (own layout); binaries `atf15xx-fit` (family from the device) and `fit1502`/`fit1504`/`fit1508` (the vendor fitters' command line) |
+| [`atf15xx-fit`](atf15xx-fit) | fitter library: `.tt2` reader and writer, netlist IR, netlist optimisation and the timing-driven strategy search, placement, PT allocation, UIM routing, foldbacks, XOR synthesis, JED reader and writer (own layout); binaries `atf15xx-fit` (family from the device) and `fit1502`/`fit1504`/`fit1508` (the vendor fitters' command line) |
 | [`atf15xx-sim`](atf15xx-sim) | functional model, simulator, Verilog emitter and static timing analyser for any ATF15xx JED |
-| [`atf15xx-synth`](atf15xx-synth) | Verilog → JED/SVF: Yosys JSON importer, constraints, strategies, `--fmax`; with feature `yosys`, the Yosys plugin `synth_atf15xx` (Rust behind a `cxx` bridge to RTLIL, built in the Yosys image, [`tools/yosys-plugin`](tools/yosys-plugin/README.md)) |
+| [`atf15xx-synth`](atf15xx-synth) | Verilog → JED/SVF, the front end: runs Yosys, imports its netlist (JSON or RTLIL), word-level lowering, constraints, init-value policy, output files; the fitting itself is `atf15xx-fit`'s; with feature `yosys`, the Yosys plugin `synth_atf15xx` (Rust behind a `cxx` bridge to RTLIL, built in the Yosys image, [`tools/yosys-plugin`](tools/yosys-plugin/README.md)) |
 | [`atf15xx-tool`](atf15xx-tool) | JED and chain files → SVF, JEDEC output, and the in-circuit boundary-scan debugger |
 
 Examples (Verilog, constraints, bench tooling): [`examples/`](examples/README.md): an SPI master

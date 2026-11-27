@@ -8,7 +8,7 @@ mismatching fuse.
 
 | script | compares |
 |---|---|
-| `verify_tt2.py` | every `.tt2` under the given paths: the vendor's `.jed` next to it (or a fresh vendor run with `--run-vendor`) against ours with the same arguments; `identical` / `bad-checksum` / `different` with the differing fuses by region |
+| `verify_tt2.py` | every `.tt2` under the given paths: the vendor's `.jed` next to it (or a fresh vendor run with `--run-vendor`) against ours with the same arguments; `identical` / `bad-checksum` / `different` with the differing fuses by region; `--hashes FILE` also writes a hash of our JED (or our error) per design, a byte-level snapshot of our fitter to diff between two versions |
 | `vendor_oracle.sh` | the open Verilog flow's `.tt2` (`atf15xx-synth --emit-tt2`) fitted by the vendor, for corpus runs: fit / macrocells / equivalence next to ours |
 
 ## Run

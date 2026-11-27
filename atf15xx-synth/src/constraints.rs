@@ -51,35 +51,8 @@ pub struct Constraints {
     pub timing: TimingTargets,
 }
 
-/// Timing targets (spec F8.7): what the flow must meet before it optimises area.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct TimingTargets {
-    /// Register-to-register frequency for every clock, MHz.
-    pub fmax: Option<f64>,
-    /// Per clock port (Verilog name): MHz.
-    pub clocks: Vec<(String, f64)>,
-    /// Maximum pin-to-pin (tPD), clock-to-output (tCO) and input setup (tSU) delays, ns.
-    pub tpd: Option<f64>,
-    pub tco: Option<f64>,
-    pub tsu: Option<f64>,
-    pub goal: Goal,
-}
-
-impl TimingTargets {
-    pub fn any(&self) -> bool {
-        self.fmax.is_some() || !self.clocks.is_empty() || self.tpd.is_some() || self.tco.is_some() || self.tsu.is_some()
-    }
-}
-
-/// What the flow optimises once the timing targets are met (or when there are none).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
-pub enum Goal {
-    /// Fewest macrocells (default).
-    #[default]
-    Area,
-    /// Highest fmax, then fewest macrocells: more strategies are tried (wider sums, fewer levels).
-    Speed,
-}
+/// The timing targets and the goal live with the strategy search that uses them.
+pub use atf15xx_fit::search::{Goal, TimingTargets};
 
 /// `66.6`, `66.6MHz`, `15ns` → number.
 fn number(w: Option<&&str>, unit: &str, e: &dyn Fn(&str) -> String) -> Result<f64, String> {

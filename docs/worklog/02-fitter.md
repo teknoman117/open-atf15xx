@@ -107,6 +107,19 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-26** (main session) — Crate boundary moved (user request: keep synth and fit
+  separate, with technology mapping on the fitter's side): `opt.rs` (netlist optimisation) and the
+  `.tt2` writer (`tt2out.rs`) moved from `atf15xx-synth` to `atf15xx-fit` (git mv, paths only); the
+  strategy search, `judge`, `fit_key`, `timing_of`, `macrocells_used`, `vendor_cmd`, `spread_pins`,
+  the fail-fast bounds (`check_bounds`) and `Goal`/`TimingTargets` are the new module
+  `atf15xx-fit/src/search.rs` (`search()` with `SearchOptions` → `Found`), taken from
+  `flow::fit_lowered` verbatim apart from names. `atf15xx-fit` now depends on `atf15xx-sim`
+  (timing; it depends only on `atf15xx-arch`), the BDD crate and rayon; synth drops rand and the
+  BDD crate. Synth keeps Yosys, import, init policy, constraints, outputs and `better` (between
+  piece forms and mappings, via `fit_key`). Checks, all byte-identical: tests 49/49, corpus and
+  examples, vendor identity 2017 / 4025 / 6155 plus a new per-design hash snapshot of our JEDs
+  for all 12,624 vendor designs (`verify_tt2.py --hashes`, added for refactor regression), the
+  29-design end-to-end benchmark (JEDs, results; 355.7 vs 354.6 s). Plugin builds.
 * **2026-11-26** — Partitioning recommendations tested (`docs/plan/partitioning.md` §5), both
   negative: (1) a UIM-matching-aware second partition search (lexicographic: over-limit blocks,
   then unmatched sources with an optimistic per-block mux mask, then balance) never ran on the

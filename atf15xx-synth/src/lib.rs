@@ -3,16 +3,14 @@
 //!
 //! ```text
 //! Verilog ──yosys + data/synth_atf15xx.ys──► Yosys JSON ──yosys::import──► netlist::Design
-//!   ──opt (limited collapse, toggle recovery)──► atf15xx_fit::fit_design ──► .jed (vendor format)
+//!   ──atf15xx_fit::search (netlist passes + strategies)──► atf15xx_fit::fit_design ──► .jed (vendor format)
 //!   ──atf15xx_tool::isp::generate──► .svf
 //! ```
 pub mod constraints;
 pub mod flow;
-pub mod opt;
 #[cfg(feature = "yosys")]
 pub mod plugin;
 pub use atf15xx_arch::part;
-pub mod tt2out;
 pub mod wordmap;
 pub mod ynet;
 pub mod yosys;

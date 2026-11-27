@@ -11,10 +11,13 @@ For every .tt2 given (files or directories, searched recursively):
     `bad-checksum` means the same fuses with a missing or wrong `C` field; on a fuse mismatch the
     differing fuses are classified by region (PT array / macrocell config / UIM / global OE / config).
 
+With --hashes FILE, also writes one line per design: the SHA-256 of our JED with its `Created` line
+removed (or of our error text), for a byte-level regression snapshot of our fitter (diff two runs).
+
 Usage:
-  tools/fuzzers/fitter-conformance/verify_tt2.py [--bin-dir DIR] [--run-vendor -- vendor args] [-v] PATH...
+  tools/fuzzers/fitter-conformance/verify_tt2.py [--bin-dir DIR] [--run-vendor -- vendor args] [--hashes FILE] [-v] PATH...
 """
-import argparse, collections, glob, json, os, re, shutil, subprocess, sys, tempfile
+import argparse, collections, glob, hashlib, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
@@ -77,11 +80,13 @@ def main():
                     help='run the vendor fitter now with these arguments (after the .tt2)')
     ap.add_argument('-v', '--verbose', action='store_true')
     ap.add_argument('--json', help='write per-design results here')
+    ap.add_argument('--hashes', help='write per-design hashes of our JED (or error) here')
     a = ap.parse_args()
     bindir = a.bin_dir or next((d for d in (os.path.join(ROOT, '.scratch', 'target-docker', 'release'),
                                             os.path.join(ROOT, 'target', 'release')) if os.path.exists(d)), None)
     stats = collections.defaultdict(collections.Counter)
     results = []
+    hashes = []
     for tt2 in find_designs(a.paths):
         base = tt2[:-4]
         txt = open(tt2, errors='replace').read()
@@ -110,6 +115,10 @@ def main():
             ojed_path = os.path.join(d, name[:-4] + '.jed')
             ojed = open(ojed_path, 'rb').read().decode('latin-1') if p.returncode == 0 and os.path.exists(ojed_path) else None
         res = dict(tt2=tt2, family=fam)
+        if a.hashes:
+            body = ''.join(l for l in ojed.splitlines(True) if not l.startswith('Created')) if ojed is not None \
+                else 'error: ' + (p.stderr or p.stdout).strip()
+            hashes.append('%s  %s\n' % (hashlib.sha256(body.encode('latin-1', 'replace')).hexdigest(), os.path.relpath(tt2, ROOT)))
         if ojed is None:
             res['status'] = 'ours-failed'
             res['error'] = (p.stderr or p.stdout).strip()[:200]
@@ -134,6 +143,8 @@ def main():
         print('ATF%sAS: %d designs: %s' % (fam, tot, ', '.join('%s %d' % kv for kv in sorted(stats[fam].items()))))
     if a.json:
         json.dump(results, open(a.json, 'w'), indent=1)
+    if a.hashes:
+        open(a.hashes, 'w').write(''.join(hashes))
 
 
 if __name__ == '__main__':

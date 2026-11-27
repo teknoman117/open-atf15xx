@@ -21,7 +21,7 @@
 //!   feedback `Fb(cell, false)`, never the pad, so tri-stated outputs read their own logic
 //!   correctly;
 //! * every other `$sop` output becomes a buried combinatorial node, later inlined by
-//!   [`crate::opt::collapse_limited`] where that keeps the product-term count reasonable.
+//!   [`atf15xx_fit::opt::collapse_limited`] where that keeps the product-term count reasonable.
 
 pub use crate::ynet::Bit;
 use crate::ynet::{self, Const, Netlist};

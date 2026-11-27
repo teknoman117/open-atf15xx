@@ -110,7 +110,7 @@ network, so the majority polarity gets the network and the rest use a PT clock.
    `--init ignore` (then a warning). Whether silicon really powers up at 0 is still open (worklog
    04/05); if it does not, designs must reset explicitly anyway.
 
-### F7.4.3 Optimisation before fitting (`atf15xx-synth/src/opt.rs`)
+### F7.4.3 Optimisation before fitting (`atf15xx-fit/src/opt.rs`)
 
 In order:
 1. **Toggle recovery** (`recover_toggles`). The next-state function is analysed with buried nodes

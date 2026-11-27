@@ -30,10 +30,7 @@ ilp = ["dep:good_lp"]
 yosys = ["dep:cxx", "dep:cxx-build"]
 
 [dependencies]
-rand = { workspace = true }
 rayon = { workspace = true }
-biodivine-lib-bdd = { workspace = true }
-rand_chacha = { workspace = true }
 atf15xx-arch = { workspace = true }
 atf15xx-fit = { workspace = true }
 atf15xx-sim = { workspace = true }

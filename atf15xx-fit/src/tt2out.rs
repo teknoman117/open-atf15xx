@@ -1,8 +1,8 @@
 //! `.tt2` writer for a netlist, so the same design can be given to the vendor fitter (oracle) or
 //! to our `fit150x` binaries. The format is the inverse of `Design::from_pla` (spec F3).
 
-use atf15xx_fit::logic::{Signal, Sop};
-use atf15xx_fit::netlist::{Design, Storage};
+use crate::logic::{Signal, Sop};
+use crate::netlist::{Design, Storage};
 use std::collections::BTreeSet;
 
 fn col(s: &Signal, d: &Design) -> String {

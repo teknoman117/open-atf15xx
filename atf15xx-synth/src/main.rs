@@ -179,7 +179,7 @@ fn run(cli: Cli) -> Result<(), String> {
             Ok(r) => {
                 notes.push(format!(
                     "{mode:?}: {} macrocells{}",
-                    flow::macrocells_used(&r.result),
+                    atf15xx_fit::search::macrocells_used(&r.result),
                     r.fmax_mhz.map_or(String::new(), |f| format!(", fmax {f:.1} MHz"))
                 ));
                 if best.as_ref().map_or(true, |(_, b)| flow::better(b, &r)) {
