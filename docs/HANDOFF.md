@@ -154,10 +154,10 @@ the CLI (F9.7), the typed netlist IR (F9.7 item 1), typed fit errors (F9.9), pro
 
 1. **Synthesis structure for dense designs**: SELFPROGRAMBOARD now 52.6 MHz from Verilog vs 55.6
    MHz from CUPL's netlist (F8.7, F9.10).
-2. **Mapping for wide cells** (`docs/plan/partitioning.md` §5, 2026-11-26): the hard placement
-   failures are blocks 10+ inputs over 40 because cells read too many signals; matching-aware
-   partitioning and replication were measured and do not help. Next lever: coarse-level mapping
-   (F9.3) that keeps comparator / carry structure as narrower cells.
+2. **Mapping for wide cells** (`docs/plan/partitioning.md` §5): the hard placement failures are
+   cells that read too many signals. Done for compares (F9.12, 2026-11-26: pieces in two forms);
+   next the same for wide adders / accumulators (their remaining failures are pins, see the
+   sweep) and wide `$pmux` / mux trees.
 3. **Mapping–placement loop in the plugin** (F9.7 item 3): re-run Yosys passes on an overflowing
    block's logic between fit attempts. Its prerequisites are in place (typed netlist IR, typed fit
    errors `FitErrorKind`, both 2026-11-26); next is choosing what to re-map on a `Routing` /

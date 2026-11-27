@@ -98,6 +98,9 @@ struct Ctx {
     alias: BTreeMap<u64, Lb>,
     out: BTreeMap<String, ynet::Cell>,
     xors: BTreeMap<(Lb, Lb), Lb>,
+    /// chunk equality nodes of wide compares, shared by `$eq` and `$lt` of the same operands
+    chunk_eq: BTreeMap<Prod, Lb>,
+    form: ChunkForm,
 }
 
 impl Ctx {
@@ -286,8 +289,165 @@ fn port(ctx: &Ctx, c: &ynet::Cell, p: &str, w: usize, signed: bool) -> Vec<Lb> {
     v
 }
 
+/// Compares wider than this are built from [`CHUNK`]-bit pieces (spec F9.12): one flat cover reads
+/// 3 signals per bit, so a 16-bit compare needs 48, more than a block's 40 UIM inputs.
+const WIDE_COMPARE: usize = 8;
+/// Bits per piece of a wide compare.
+const CHUNK: usize = 4;
+
+/// How a wide compare is built from pieces (spec F9.12). Neither form wins everywhere (measured on
+/// registered compares of 8–38 bits): XOR nodes cost a macrocell per bit but keep every piece one
+/// product wide; flat pieces need no XOR nodes (fewer macrocells, the only form that fits a 20-bit
+/// compare on the ATF1504AS) but 7–8 products each. The flow fits both and keeps the better.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChunkForm {
+    /// an XOR node per bit pair, pieces as products of them; else flat pieces over the operand bits
+    pub xor_nodes: bool,
+    /// bits per piece
+    pub bits: usize,
+}
+
+/// XOR nodes per bit, 4-bit pieces (the default).
+pub const CHUNK_XOR4: ChunkForm = ChunkForm { xor_nodes: true, bits: CHUNK };
+/// Flat 3-bit pieces.
+pub const CHUNK_FLAT3: ChunkForm = ChunkForm { xor_nodes: false, bits: 3 };
+
+/// `a == b` over a chunk as a flat cover of its bits: Π (a_i·b_i + !a_i·!b_i), expanded.
+fn eq_flat(a: &[Lb], b: &[Lb]) -> Vec<Prod> {
+    let mut prods: Vec<Prod> = vec![vec![]];
+    for i in 0..a.len() {
+        prods = prods
+            .into_iter()
+            .flat_map(|p| {
+                let mut q1 = p.clone();
+                q1.extend([(a[i], true), (b[i], true)]);
+                let mut q0 = p;
+                q0.extend([(a[i], false), (b[i], false)]);
+                [q1, q0]
+            })
+            .collect();
+    }
+    prods
+}
+
+/// `a < b` over a chunk as a flat cover of its bits: Σ_i !a_i·b_i·Π_{j>i} (a_j ≡ b_j), expanded.
+fn less_flat(a: &[Lb], b: &[Lb]) -> Vec<Prod> {
+    let n = a.len();
+    let mut out = vec![];
+    for i in 0..n {
+        for mut q in eq_flat(&a[i + 1..], &b[i + 1..]) {
+            q.extend([(a[i], false), (b[i], true)]);
+            out.push(q);
+        }
+    }
+    out
+}
+
+/// The equality literals of `a == b`, bit by bit (an XOR node per bit pair, a literal against a
+/// constant).
+fn eq_lits(ctx: &mut Ctx, a: &[Lb], b: &[Lb]) -> Vec<Prod> {
+    (0..a.len())
+        .map(|j| match (ctx.res(a[j]), ctx.res(b[j])) {
+            (x, Lb::C(c)) => vec![(x, c)],
+            (Lb::C(c), y) => vec![(y, c)],
+            (x, y) => {
+                let d = ctx.xor_small(&[x, y]);
+                vec![(d, false)]
+            }
+        })
+        .collect()
+}
+
+/// The equality node of one chunk (a single product), shared between the compares that need it.
+fn chunk_eq(ctx: &mut Ctx, lits: &[Prod]) -> Lb {
+    let p: Prod = lits.iter().flatten().copied().collect();
+    if let Some(&x) = ctx.chunk_eq.get(&p) {
+        return x;
+    }
+    let x = ctx.emit(vec![p.clone()]);
+    ctx.chunk_eq.insert(p, x);
+    x
+}
+
+/// `a == b` for a wide compare: the AND of its chunks' equality nodes.
+fn equal_chunked(ctx: &mut Ctx, a: &[Lb], b: &[Lb]) -> Lb {
+    let (xor, k) = (ctx.form.xor_nodes, ctx.form.bits);
+    if !xor {
+        let a: Vec<Lb> = a.iter().map(|&x| ctx.res(x)).collect();
+        let b: Vec<Lb> = b.iter().map(|&x| ctx.res(x)).collect();
+        let es: Vec<Lb> = (0..a.len())
+            .step_by(k)
+            .map(|s| {
+                let e = (s + k).min(a.len());
+                flat_eq_node(ctx, &a[s..e], &b[s..e])
+            })
+            .collect();
+        return ctx.and(&es);
+    }
+    let lits = eq_lits(ctx, a, b);
+    let es: Vec<Lb> = lits.chunks(k).map(|c| chunk_eq(ctx, c)).collect();
+    ctx.and(&es)
+}
+
+/// A flat chunk equality node, shared between the compares of the same operand bits.
+fn flat_eq_node(ctx: &mut Ctx, a: &[Lb], b: &[Lb]) -> Lb {
+    let key: Prod = a.iter().zip(b).flat_map(|(&x, &y)| [(x, true), (y, true)]).collect();
+    if let Some(&x) = ctx.chunk_eq.get(&key) {
+        return x;
+    }
+    let x = ctx.emit(eq_flat(a, b));
+    ctx.chunk_eq.insert(key, x);
+    x
+}
+
+/// `a < b` for a wide compare (spec F9.12): per chunk c the flat less-than `l_c` and the equality
+/// `e_c`, then `a < b = Σ_c l_c·Π_{d>c} e_d`. Every cell reads at most ~3·CHUNK signals, and the
+/// combining cell two per chunk.
+fn less_chunked(ctx: &mut Ctx, a: &[Lb], b: &[Lb]) -> Lb {
+    let (xor, k) = (ctx.form.xor_nodes, ctx.form.bits);
+    let n = a.len();
+    let starts: Vec<usize> = (0..n).step_by(k).collect();
+    let mut ls = vec![];
+    let mut es = vec![];
+    if !xor {
+        let a: Vec<Lb> = a.iter().map(|&x| ctx.res(x)).collect();
+        let b: Vec<Lb> = b.iter().map(|&x| ctx.res(x)).collect();
+        for &s in &starts {
+            let e = (s + k).min(n);
+            ls.push(ctx.emit(less_flat(&a[s..e], &b[s..e])));
+            es.push(flat_eq_node(ctx, &a[s..e], &b[s..e]));
+        }
+    }
+    let lits = if xor { eq_lits(ctx, a, b) } else { vec![] };
+    for &s in starts.iter().filter(|_| xor) {
+        let e = (s + k).min(n);
+        let mut prods = vec![];
+        for i in s..e {
+            let mut p: Prod = vec![(a[i], false), (b[i], true)];
+            for l in &lits[i + 1..e] {
+                p.extend(l.iter().copied());
+            }
+            prods.push(p);
+        }
+        ls.push(ctx.emit(prods));
+        es.push(chunk_eq(ctx, &lits[s..e]));
+    }
+    let mut prods = vec![];
+    for c in 0..ls.len() {
+        let mut p: Prod = vec![(ls[c], true)];
+        for &e in &es[c + 1..] {
+            p.push((e, true));
+        }
+        prods.push(p);
+    }
+    ctx.emit(prods)
+}
+
 /// `a < b` (unsigned, LSB first): Σ_i !a_i·b_i·Π_{j>i} (a_j == b_j).
 fn less(ctx: &mut Ctx, a: &[Lb], b: &[Lb]) -> Lb {
+    if a.len() > WIDE_COMPARE {
+        return less_chunked(ctx, a, b);
+    }
     let n = a.len();
     let eqlits: Vec<Prod> = (0..n)
         .map(|j| match (ctx.res(a[j]), ctx.res(b[j])) {
@@ -339,7 +499,7 @@ fn add(ctx: &mut Ctx, a: &[Lb], b: &[Lb], cin: Lb) -> Vec<Lb> {
 
 /// Lower the coarse cells of a module (Yosys JSON schema, in place). Returns the number of
 /// coarse cells lowered; `Err` names a coarse cell type that is neither lowered nor a fine cell.
-pub fn lower_module(m: &mut ynet::Module) -> Result<usize, String> {
+pub fn lower_module(m: &mut ynet::Module, form: ChunkForm) -> Result<usize, String> {
     let cells = m.cells.clone();
     let mut next = 2;
     let mut scan = |v: &[Bit]| {
@@ -410,7 +570,7 @@ pub fn lower_module(m: &mut ynet::Module) -> Result<usize, String> {
             visit(name, &cells, &driver, &mut state, &mut order);
         }
     }
-    let mut ctx = Ctx { next, n: 0, alias: BTreeMap::new(), out: BTreeMap::new(), xors: BTreeMap::new() };
+    let mut ctx = Ctx { next, n: 0, alias: BTreeMap::new(), out: BTreeMap::new(), xors: BTreeMap::new(), chunk_eq: BTreeMap::new(), form };
     for name in &order {
         let c = &cells[name];
         let t = c.ty.as_str();
@@ -457,18 +617,22 @@ pub fn lower_module(m: &mut ynet::Module) -> Result<usize, String> {
             "$eq" | "$ne" | "$eqx" | "$nex" => {
                 let w = aw.max(bw);
                 let (a, b) = (port(&ctx, c, "A", w, both), port(&ctx, c, "B", w, both));
-                let mut p: Prod = vec![];
-                for i in 0..w {
-                    match (ctx.res(a[i]), ctx.res(b[i])) {
-                        (x, Lb::C(k)) => p.push((x, k)),
-                        (Lb::C(k), z) => p.push((z, k)),
-                        (x, z) => {
-                            let d = ctx.xor_small(&[x, z]);
-                            p.push((d, false));
+                let eq = if w > WIDE_COMPARE {
+                    equal_chunked(&mut ctx, &a, &b)
+                } else {
+                    let mut p: Prod = vec![];
+                    for i in 0..w {
+                        match (ctx.res(a[i]), ctx.res(b[i])) {
+                            (x, Lb::C(k)) => p.push((x, k)),
+                            (Lb::C(k), z) => p.push((z, k)),
+                            (x, z) => {
+                                let d = ctx.xor_small(&[x, z]);
+                                p.push((d, false));
+                            }
                         }
                     }
-                }
-                let eq = ctx.emit(vec![p]);
+                    ctx.emit(vec![p])
+                };
                 let r = if t == "$eq" || t == "$eqx" { eq } else { ctx.not(eq) };
                 widen(r, yw)
             }
@@ -610,11 +774,19 @@ pub fn has_coarse(netlist: &Netlist) -> bool {
     netlist.modules.values().any(|m| m.cells.values().any(|c| LOWERED.contains(&c.ty.as_str())))
 }
 
-/// Lower every module of a netlist.
-pub fn lower(netlist: &mut Netlist) -> Result<usize, String> {
+/// Does the netlist compare words wider than [`WIDE_COMPARE`] bits (built from pieces)?
+pub fn has_wide_compare(netlist: &Netlist) -> bool {
+    let wide = |c: &ynet::Cell| param(c, "A_WIDTH").max(param(c, "B_WIDTH")) > WIDE_COMPARE;
+    netlist.modules.values().any(|m| {
+        m.cells.values().any(|c| matches!(c.ty.as_str(), "$eq" | "$ne" | "$eqx" | "$nex" | "$lt" | "$le" | "$gt" | "$ge") && wide(c))
+    })
+}
+
+/// Lower every module of a netlist, wide compares in the given form.
+pub fn lower(netlist: &mut Netlist, form: ChunkForm) -> Result<usize, String> {
     let mut n = 0;
     for m in netlist.modules.values_mut() {
-        n += lower_module(m)?;
+        n += lower_module(m, form)?;
     }
     Ok(n)
 }

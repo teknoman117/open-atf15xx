@@ -388,3 +388,41 @@ successful fits 0.2 s, failing fits about 0.9 s. Overall SELFPROGRAMBOARD 26 s �
 ILP pre-check of block feasibility for dense designs remains possible; the cheap bound already
 catches the corpus's only infeasible build.
 
+## F9.12 Wide compares from pieces (2026-11-26)
+
+**Problem.** The word-level mapping lowered `a < b` as one flat cover `Σ_i !a_i·b_i·Π_{j>i}(a_j ≡ b_j)`
+over an XOR node per bit pair, and `a == b` as one product of them. Such a cell reads 3 signals per
+bit, so beyond about 13 bits no block can deliver its inputs (40 UIM inputs). Measured on
+registered compares (`.scratch/mploop/edge.py`): the placement failures were blocks 10 or more
+inputs over 40 (`docs/plan/partitioning.md` §5), not a partitioning weakness.
+
+**Form.** Compares wider than `WIDE_COMPARE` = 8 bits (`wordmap.rs`) are built from pieces: per
+piece c a less-than `l_c` and an equality `e_c`, then `a < b = Σ_c l_c·Π_{d>c} e_d` and
+`a == b = Π_c e_c` (the `e_c` shared when both compares read the same operands). Two piece forms
+(`ChunkForm`):
+
+* `CHUNK_XOR4`: XOR nodes per bit pair, 4-bit pieces (`e_c` one product, `l_c` four);
+* `CHUNK_FLAT3`: no XOR nodes, 3-bit pieces flat over the operand bits (`e_c` 8 products, `l_c` 7,
+  each one cascade helper; input-register macrocells lend their free PTs).
+
+Neither wins everywhere (word mapping alone, 8–38-bit registered compares, MCs): flat pieces save
+a macrocell per bit and fit 20 bits on the ATF1504AS (XOR4 does not); XOR4 fits 38 bits on the
+ATF1508AS (flat pieces do not). So the flow lowers a netlist with wide compares in both forms,
+fits both (in parallel, each under the fit budget) and keeps the better (`flow::better`; the first
+on a tie); designs without wide compares take the single path unchanged (corpus byte-identical).
+
+**Results** (full flow, both mappings, every fit PROVEN against its Verilog):
+
+| registered compare | before | now |
+|---|---|---|
+| 10 bits, ATF1502AS-PLCC44 | 31 MCs | 27 MCs (flat) |
+| 16 bits, ATF1504AS-TQFP100 | 54 MCs | 44 MCs (flat) |
+| 18 bits, ATF1504AS-TQFP100 | 60 MCs | 49 MCs (flat) |
+| 20 bits, ATF1504AS-TQFP100 | does not fit | 54 MCs (flat) |
+| 26 / 30 bits, ATF1508AS-TQFP100 | 87 / 101 MCs | 71 / 81 MCs (flat) |
+| 34 / 38 bits, ATF1508AS-TQFP100 | does not fit | 112 / 127 MCs (XOR4) |
+
+Regression design: `atf15xx-synth/tests/designs/cmpwide.v` (20 bits, both TQFP100 parts, 54 MCs,
+PROVEN). fmax is lower than the flat cover's where that fitted (two logic levels: 35–43 MHz vs
+38–55 MHz); a timing target (`fmax` / `--fmax`) makes `better` prefer the faster fit.
+

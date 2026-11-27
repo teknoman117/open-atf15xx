@@ -309,16 +309,50 @@ pub fn fit_json(json_text: &str, o: &FlowOptions, cmdline: &str) -> Result<Outpu
 
 /// [`fit_json`] from a typed netlist (a JSON file, or RTLIL through the Yosys plugin).
 pub fn fit_netlist(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &str) -> Result<Outputs, String> {
-    // a word-level netlist (--map words, the plugin): lower its coarse cells first (F9.9)
-    let lowered;
-    let netlist = if crate::wordmap::has_coarse(netlist) {
-        let mut n = netlist.clone();
-        crate::wordmap::lower(&mut n)?;
-        lowered = n;
-        &lowered
-    } else {
-        netlist
-    };
+    use crate::wordmap;
+    if !wordmap::has_coarse(netlist) {
+        return fit_lowered(netlist, o, cmdline);
+    }
+    // a word-level netlist (--map words, the plugin): lower its coarse cells first (F9.9); wide
+    // compares in both piece forms, the better fit kept (F9.12; the first on a tie)
+    let forms: &[wordmap::ChunkForm] =
+        if wordmap::has_wide_compare(netlist) { &[wordmap::CHUNK_XOR4, wordmap::CHUNK_FLAT3] } else { &[wordmap::CHUNK_XOR4] };
+    use rayon::prelude::*;
+    let fits: Vec<Result<Outputs, String>> = forms
+        .par_iter()
+        .map(|&form| {
+            let mut n = netlist.clone();
+            wordmap::lower(&mut n, form)?;
+            fit_lowered(&n, o, cmdline)
+        })
+        .collect();
+    let mut best: Option<(usize, Outputs)> = None;
+    let mut first_err = None;
+    for (k, fit) in fits.into_iter().enumerate() {
+        match fit {
+            Ok(r) => {
+                if best.as_ref().map_or(true, |(_, b)| better(b, &r)) {
+                    best = Some((k, r));
+                }
+            }
+            Err(e) => {
+                first_err.get_or_insert(e);
+            }
+        }
+    }
+    match best {
+        Some((k, mut r)) => {
+            if forms.len() > 1 {
+                r.warnings.push(format!("wide compares built as {:?} (of {} forms fitted)", forms[k], forms.len()));
+            }
+            Ok(r)
+        }
+        None => Err(first_err.unwrap_or_else(|| "no fit".into())),
+    }
+}
+
+/// [`fit_netlist`] after the word-level lowering: import, strategies, outputs.
+fn fit_lowered(netlist: &crate::ynet::Netlist, o: &FlowOptions, cmdline: &str) -> Result<Outputs, String> {
     let mut imp = yosys::import_netlist(netlist, o.top.as_deref())?;
     let mut warnings = std::mem::take(&mut imp.warnings);
     let ones: Vec<&String> = imp.inits.iter().filter(|(_, v)| **v).map(|(n, _)| n).collect();

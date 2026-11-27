@@ -192,6 +192,13 @@ is green.
 
 ## Journal
 
+* **2026-11-26** (main session) — Wide compares from pieces (F9.12, user: "go ahead with
+  coarse-level mapping"): `wordmap.rs` builds `$eq/$ne/$lt/$le/$gt/$ge` wider than 8 bits from
+  pieces in two forms (XOR nodes + 4-bit pieces, or flat 3-bit pieces); the flow fits both and
+  keeps the better. Registered compares: 20 bits now fit the ATF1504AS (54/64) and 34/38 bits the
+  ATF1508AS; every fitting size uses 4–20 fewer macrocells than before; all PROVEN. New corpus
+  design `cmpwide` (20 bits, TQFP100 parts, PROVEN). Corpus (37), examples, SELFPROGRAMBOARD
+  byte-identical (no compare wider than 8 bits), tests 48/48, plugin builds.
 * **2026-11-26** (main session) — Typed netlist IR (F9.7 item 1, task #22): `ynet.rs` (serde
   structs for the Yosys JSON schema); the importer, `wordmap` and the flow read it, and the plugin
   fills it straight from RTLIL (`plugin::netlist`; `-check-json` compares typed netlists). No
