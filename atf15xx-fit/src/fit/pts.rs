@@ -257,16 +257,32 @@ impl Planner<'_> {
             }
         }
         let n = pl.sum.len();
-        for (i, p) in pl.sum.clone().into_iter().enumerate() {
-            if i < free.len() {
+        if n <= free.len() {
+            for (i, p) in pl.sum.clone().into_iter().enumerate() {
                 pl.pts.insert(free[i], p);
                 pl.in_sum.insert(free[i]);
+            }
+            return Ok(());
+        }
+        // a cascade chain, laid out as the vendor does (`tools/fuzzers/fitter-cascade`): the
+        // products in the order 1, 2, ..., n-1, 0 fill h helpers completely, the deepest (MC-h)
+        // first, and the cell's own PTs take the rest
+        let h = (n - free.len()).div_ceil(PTS_PER_MC);
+        if h > MAX_CHAIN_MCS - 1 || !self.opts.cascade {
+            return err(FitErrorKind::Capacity, format!("{}: {} product terms do not fit", c.name, n));
+        }
+        let mut seq = pl.sum.clone();
+        seq.rotate_left(1);
+        let in_helpers = (h * PTS_PER_MC).min(n);
+        for (q, p) in seq.into_iter().enumerate() {
+            if q < in_helpers {
+                // helper (counted from the cell, MC-1) and slot of the q-th product
+                let helper = h - q / PTS_PER_MC;
+                pl.helper_pts.insert((helper - 1) * PTS_PER_MC + q % PTS_PER_MC + 1, p);
             } else {
-                let k = i - free.len() + 1;
-                if k > (MAX_CHAIN_MCS - 1) * PTS_PER_MC || !self.opts.cascade {
-                    return err(FitErrorKind::Capacity, format!("{}: {} product terms do not fit", c.name, n));
-                }
-                pl.helper_pts.insert(k, p);
+                let i = q - in_helpers;
+                pl.pts.insert(free[i], p);
+                pl.in_sum.insert(free[i]);
             }
         }
         Ok(())

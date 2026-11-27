@@ -132,9 +132,18 @@ pub(super) fn assemble(
                 set(McBit::Pt3Mux, h.ar_pt || !pl.in_sum.contains(&3));
             }
         } else if let Some(t) = u.helper_for {
-            // cascade helper: all PTs into its sum, sum to cascade output
+            // cascade helper: all PTs into its sum, sum to cascade output; the vendor's helper
+            // configuration (`tools/fuzzers/fitter-cascade`, all 108 helpers of its designs):
+            // a register (Storage = 1, Pt5Func = 0) and, unless its pad is an input, OE select 111
             let pl = &plans[uses[t as usize].cell.unwrap()];
             encode_unused(u.pad_used, &mut set);
+            set(McBit::Storage, true);
+            set(McBit::Pt5Func, false);
+            if !u.pad_used {
+                for b in [McBit::OeMux0, McBit::OeMux1, McBit::OeMux2] {
+                    set(b, true);
+                }
+            }
             set(McBit::CasMux, true);
             set(McBit::PtPowerOff, false);
             for k in 1..=5 {

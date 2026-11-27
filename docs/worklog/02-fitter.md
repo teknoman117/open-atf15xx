@@ -107,6 +107,18 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-27** (main session) — Chains laid out as the vendor does (HANDOFF item 6). The vendor
+  corpus of 12,624 designs has no cascade at all (`atf15xx-sim stats`), so the chain layout had
+  never been compared; the 60 `fitter-cascade` designs showed it: products 1, 2, …, n−1, 0 fill
+  the helpers from the deepest up, the cell keeps the rest; helpers are configured as registers
+  with OE select 111 (000 under an input pad: 108 of 108); floating inputs follow that order,
+  and within a product the source's column order. A first version reordered every sum wider than
+  the free PTs and lost 25 ATF1502AS identities (8-term ORs of literals, which the vendor folds
+  back instead of chaining); it now reorders only sums the planner will chain. Cascade designs:
+  0 → 36 of 44 fuse-identical; vendor corpus 2017 / 4025 / 6155 and all 12,624 JEDs
+  byte-identical. Changed outputs (chain layouts): corpus cmpreg, cmpwide, mux16, parity, spi
+  (11 JEDs), the spi1504 example and 10 benchmark JEDs, all PROVEN against their Verilog;
+  benchmark results (macrocells, fmax) unchanged. New test `chains_are_laid_out_as_the_vendor_does`.
 * **2026-11-27** (main session) — `fit.rs` (2,800 lines) split into the module `fit/`, one file
   per pass (user request: cut the spaghetti): `mod.rs` (options, results, errors, the attempt
   driver and the state between passes, 600 lines), `place.rs`, `partition.rs`, `positions.rs`,

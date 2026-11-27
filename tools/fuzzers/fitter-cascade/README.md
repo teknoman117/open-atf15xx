@@ -35,9 +35,11 @@ for d in .scratch/oracle/cascade/*/; do n=$(basename $d); \
 * **31–40 terms: no cascade at all**; the vendor builds the sum from more product terms in
   other macrocells (31 terms: 38 product terms, no cascade link). The longest chain the vendor builds is
   therefore 6 macrocells; the fitter uses the same limit (`MAX_CHAIN_MCS`).
-* Our fitter (with chains, 2026-11-26) against the vendor: every design that we fit (6–25 terms,
-  44) is PROVEN equivalent to its `.tt2`, as is every vendor JED; the fuses differ because our
-  input pins differ (the vendor's order of input placement is not yet modelled: it places D0
-  last), so these designs are not fuse-identical. 30 terms: our UIM routing fails (36 inputs in
+* The layout: products 1, 2, …, n−1, 0 fill the helpers from the deepest up, five each, the cell
+  keeps the rest; helpers are registers with OE select 111 (000 when their pad is an input);
+  inputs are placed in that order (so D0 last). With that modelled (2026-11-27) our fitter is
+  fuse-identical on 36 of the 44 designs it fits (6–16 terms, all variants); the 20- and 25-term
+  ones differ in UIM selections. All 44, and every vendor JED, are PROVEN equivalent to their
+  `.tt2`. 30 terms: our UIM routing fails (36 inputs in
   one block) where the vendor fits; 31–40: ours fails (sums from nodes not implemented in the
   `.tt2` path).

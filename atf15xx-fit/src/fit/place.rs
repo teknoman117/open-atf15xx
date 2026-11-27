@@ -477,11 +477,25 @@ impl<'a> PlaceState<'a> {
             .map(|(i, c)| (self.place_of.get(&c.name).map_or(99, |_| (mc_of(&self.place_of, &c.name) - 1) / 16), !c.is_output, i))
             .collect();
         visit.sort();
+        let column: BTreeMap<&str, usize> = design.input_order.iter().enumerate().map(|(i, n)| (n.as_str(), i)).collect();
         let mut order: Vec<String> = vec![];
         for (_, _, i) in visit {
             let c = &design.cells[i];
             let mut sigs: Vec<&Signal> = vec![];
-            for s in [Some(&c.data), c.clk.as_ref(), c.ce.as_ref(), c.ar.as_ref(), c.ap.as_ref(), c.oe.as_ref()].into_iter().flatten() {
+            // the data products in the order of the macrocells that will hold them: a cascade
+            // chain's helpers (from the deepest) before the cell's own PTs, as the vendor
+            // visits them (`tools/fuzzers/fitter-cascade`)
+            for p in chain_order(c, self.demand[i]) {
+                // within a product, the inputs in the order of the source's columns (the vendor
+                // reads its cubes column by column)
+                let mut ps: Vec<&Signal> = p.iter().map(|(sig, _)| sig).collect();
+                ps.sort_by_key(|s| match s {
+                    Signal::Pad(n) => column.get(n.as_str()).copied().unwrap_or(usize::MAX),
+                    _ => usize::MAX,
+                });
+                sigs.extend(ps);
+            }
+            for s in [c.clk.as_ref(), c.ce.as_ref(), c.ar.as_ref(), c.ap.as_ref(), c.oe.as_ref()].into_iter().flatten() {
                 for p in &s.0 {
                     for (sig, _) in p {
                         sigs.push(sig);
@@ -630,6 +644,18 @@ impl<'a> PlaceState<'a> {
         }
         Ok(Placed { uses: self.uses, place_of: self.place_of, host_of: self.host_of, fast_in: self.fast_in })
     }
+}
+
+/// A cell's data products in the order the macrocells holding them come: for a sum that becomes
+/// a cascade chain (the estimate needs helpers, and foldback factoring does not shrink it), the
+/// order `pts::Planner::plan_sum` fills the chain in, 1, 2, ..., n-1, 0 (from the deepest helper
+/// up to the cell's own PTs); else as given.
+fn chain_order<'c>(c: &'c Cell, demand: usize) -> Vec<&'c Vec<(Signal, bool)>> {
+    let mut order: Vec<&Vec<(Signal, bool)>> = c.data.0.iter().collect();
+    if !c.active_low && helpers_for(demand) > 0 && factored_len(&c.data) == c.data.0.len() {
+        order.rotate_left(1);
+    }
+    order
 }
 
 /// Place every eligible register into the macrocell of the input pin that is its D (see

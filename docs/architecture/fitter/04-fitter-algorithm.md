@@ -54,8 +54,17 @@ mapping to DFF/DFFE/latch with async set/reset, each Yosys output/flop maps to o
   wider sums without cascades (*oracle-verified*, `tools/fuzzers/fitter-cascade`, ATF1504AS,
   6–40 terms, 2026-11-26). Our fitter puts sum term k beyond the cell's own free PTs into
   helper MC−h, h = ⌈k / 5⌉, slot (k − 1) mod 5 + 1 (`atf15xx-fit/src/capacity.rs`, shared by
-  the netlist passes, placement and the planner); the chained JEDs are PROVEN equivalent to
-  their `.tt2` (44 designs), not fuse-identical (the input pin order differs).
+  the netlist passes, placement and the planner).
+  **Layout of a chain** (*oracle-verified*, same corpus, 2026-11-27): the products in the order
+  1, 2, …, n−1, 0 fill the h = ⌈(n − free) / 5⌉ helpers completely, the deepest (MC−h) first,
+  then the cell's own free PTs in PT order (n = 8: MC−1 holds products 1–5, the cell 6, 7, 0).
+  A helper is configured as a register (`Storage` = 1, `Pt5Func` = 0, `CasMux` = 1, its PTs on)
+  with OE select 111 when its pad is free and 000 when the pad is an input (108 helpers, no
+  exception). Floating inputs are placed in that same order of first use (the chain's products
+  from the deepest helper up), and within a product in the source's column order. Only a sum the
+  planner will chain is reordered (the estimate needs helpers and foldback factoring does not
+  shrink it). Result: 36 of the 44 cascade designs we fit are fuse-identical (the other 8: 20- and
+  25-term sums, UIM selections differ); all 44 PROVEN equivalent to their `.tt2`.
 
 ## F4.4 Global nets [O]
 

@@ -89,3 +89,38 @@ fn sums_beyond_the_longest_chain_are_refused() {
     let e = atf15xx_fit::fit(Family::F1504, &pla, &opts).err().expect("no fit");
     assert!(e.is_capacity(), "{e}");
 }
+
+/// The chain's layout (2026-11-27, as the vendor builds it, `tools/fuzzers/fitter-cascade`): the
+/// products in the order 1, 2, ..., n-1, 0 fill the helpers from the deepest up, five each, and
+/// the cell's own PTs take the rest, in PT order.
+#[test]
+fn chains_are_laid_out_as_the_vendor_does() {
+    let dev = Device::by_name("P1504T100").unwrap();
+    for (n, want) in [
+        (6, vec![(37, vec![1, 2, 3, 4, 5]), (38, vec![0])]),
+        (8, vec![(37, vec![1, 2, 3, 4, 5]), (38, vec![6, 7, 0])]),
+        (12, vec![(36, vec![1, 2, 3, 4, 5]), (37, vec![6, 7, 8, 9, 10]), (38, vec![11, 0])]),
+    ] {
+        let pla = Pla::parse(&tt2(n, Some(46))).unwrap();
+        let opts = Options { device: Some(dev.name.to_string()), ..Options::default() };
+        let r = atf15xx_fit::fit(Family::F1504, &pla, &opts).unwrap();
+        let m = Model::new(dev, &r.fuses.bits, SimOptions::default());
+        let data_mc: Vec<u16> = (0..n).map(|i| pin_of(&r, &format!("D{i}")).1).collect();
+        for (mc, products) in want {
+            // which D input each sum PT of `mc` reads, in PT order
+            let got: Vec<usize> = m
+                .mc(mc)
+                .sum_pts()
+                .map(|p| {
+                    p.iter()
+                        .find_map(|l| match l {
+                            atf15xx_sim::model::Lit::Sig(atf15xx_sim::model::Sig::Pad(pm), true) => data_mc.iter().position(|d| d == pm),
+                            _ => None,
+                        })
+                        .unwrap()
+                })
+                .collect();
+            assert_eq!(got, products, "{n} terms, MC{mc}");
+        }
+    }
+}

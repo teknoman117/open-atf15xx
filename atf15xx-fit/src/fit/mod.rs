@@ -331,7 +331,7 @@ pub fn fit(family: Family, pla: &Pla, opts: &Options) -> Result<FitResult, FitEr
 pub const UIM_INPUTS_PER_BLOCK: usize = 40;
 
 pub use crate::capacity::MAX_CHAIN_PTS;
-use crate::capacity::{helper_slot, helpers_for, pt_demand, COMPLEMENT_CHOICE_CUBES, MAX_CHAIN_MCS, PTS_PER_MC};
+use crate::capacity::{factored_len, helper_slot, helpers_for, pt_demand, COMPLEMENT_CHOICE_CUBES, MAX_CHAIN_MCS, PTS_PER_MC};
 
 /// Cells whose product terms would need more signals than a block's UIM delivers can never fit:
 /// report them instead of trying (and instead of complementing huge functions).
