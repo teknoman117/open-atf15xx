@@ -88,7 +88,7 @@ pub struct FlowOptions {
     pub constraints: Constraints,
     /// Extra fitter options (`key value...`).
     pub fit_options: Vec<(String, Vec<String>)>,
-    /// Product terms per cell (macrocell + one cascade neighbour) for inlining and splitting.
+    /// Product terms per cell (its macrocell and cascade helpers) for inlining and splitting.
     pub max_products: usize,
     /// `max_products` was given explicitly (fewer strategies are tried).
     pub max_products_given: bool,

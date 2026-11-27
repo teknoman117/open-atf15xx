@@ -812,3 +812,21 @@ combined in one more cell, the same comparisons fit: 20 bits on the ATF1504AS wh
 the limit, 36 on the ATF1508AS where 30 had been, and every size that already fitted got smaller,
 178 macrocells over 17 builds. Neither piece shape won everywhere, so the flow builds both and
 keeps the better.
+
+## Chapter 28: Three opinions about one macrocell (2026-11-27)
+
+The 12-way register file in the benchmark would not fit, and the reason was a disagreement: the
+synthesis side split wide sums assuming a macrocell could borrow one neighbour's terms, placement
+reserved room for chains of up to sixteen macrocells, and the code that finally wrote the product
+terms used exactly one neighbour. Nobody had asked the vendor fitter what it does with a sum of
+twelve terms. Asked (sums of 6 to 40 terms, 60 designs), it builds chains: one helper per further
+five terms, always the macrocells directly below, never more than six in a row; beyond 30 terms it
+stops chaining altogether. That became the one model all three now share, in a small module of its
+own, and the planner learned chains. The register file fits (108 of 128 macrocells), its 11-way
+sibling shrank from 109 to 100, and every chained design the fitter built was proven equivalent to
+its source. The first version of the shared model was too honest in the wrong place: counting a
+15-term cover as three macrocells, without the fitter's foldback factoring that makes it two, it
+steered an accumulator from 62.5 MHz to 10. Using the fitter's own estimate everywhere fixed that,
+which was the point of having one model in the first place. On the way, the equivalence harness
+turned out to have been checking a stale fitter binary since the crates were renamed, and now
+refuses to.

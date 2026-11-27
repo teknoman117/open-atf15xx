@@ -49,7 +49,13 @@ mapping to DFF/DFFE/latch with async set/reset, each Yosys output/flop maps to o
   (`Pt5Func` = 1), OE → PT5 (`Pt5Func` = 0).
 * Sum PTs fill PT1, PT2, … skipping specials, in the order of the `.tt2` cubes.
 * More than the free PTs → cascade from MC−1 (helper gets `CasMux` = 1; observed direction is
-  always MC−1 → MC).
+  always MC−1 → MC). Wider sums chain further down: MC−2 into MC−1, and so on, one helper per
+  further 5 terms, all in the cell's block, at most 6 macrocells (30 terms); the vendor builds
+  wider sums without cascades (*oracle-verified*, `tools/fuzzers/fitter-cascade`, ATF1504AS,
+  6–40 terms, 2026-11-26). Our fitter puts sum term k beyond the cell's own free PTs into
+  helper MC−h, h = ⌈k / 5⌉, slot (k − 1) mod 5 + 1 (`atf15xx-fit/src/capacity.rs`, shared by
+  the netlist passes, placement and the planner); the chained JEDs are PROVEN equivalent to
+  their `.tt2` (44 designs), not fuse-identical (the input pin order differs).
 
 ## F4.4 Global nets [O]
 
@@ -222,7 +228,7 @@ non-identical 1508 output (**open**).
 * `XOR_Synthesis on` (vendor uses PT2 → XOR with `Pt2Mux` = 1, `Invert` = 1).
 * Logic doubling, `Global_Fold`, `Soft_Buffer`, `Latch_Synthesis`, `fast_inlatch` options are accepted
   and ignored.
-* Cascade chains longer than one helper are allocated but not oracle-tested.
+* Cascade chains longer than one helper: built up to 6 macrocells (F4.3); equivalence-checked, not fuse-identical with the vendor.
 
 ## F4.6c Block assignment against an exact solver (2026-11-25)
 

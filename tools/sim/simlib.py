@@ -13,8 +13,9 @@ def cargo_bin(pkg, name):
     if pkg not in _built and not os.environ.get('SIM_NO_BUILD'):
         r = subprocess.run(['cargo', 'build', '--release', '-q', '-p', pkg], cwd=ROOT)
         if r.returncode != 0:
-            if not os.path.exists(path):
-                raise SystemExit('cargo build -p %s failed and no previous binary exists' % pkg)
+            # a stale binary silently checks old code: fail unless explicitly allowed
+            if not os.path.exists(path) or not os.environ.get('SIM_ALLOW_STALE'):
+                raise SystemExit('cargo build -p %s failed (set SIM_ALLOW_STALE=1 to use an existing %s)' % (pkg, path))
             print('warning: cargo build -p %s failed; using the existing %s' % (pkg, path), file=sys.stderr)
         _built[pkg] = True
     return path
@@ -25,7 +26,8 @@ def sim_bin():
 
 
 def fit_bin(family):
-    return cargo_bin('fit' + family, 'fit' + family)
+    # the fit1502/1504/1508 binaries belong to the atf15xx-fit package
+    return cargo_bin('atf15xx-fit', 'fit' + family)
 
 
 def stim_pins(dev):

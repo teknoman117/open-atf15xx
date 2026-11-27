@@ -2,7 +2,7 @@
 
 use crate::jed::Fuses;
 use crate::logic::{Signal, Sop};
-use crate::netlist::{Cell, Design, Storage, XorSplit};
+use crate::netlist::{Cell, Design, Storage};
 use crate::tt2::Pla;
 use atf15xx_arch::{ConfigBit, Dedicated, Device, Family, McBit, Source};
 use std::collections::{BTreeMap, BTreeSet};
@@ -307,11 +307,8 @@ pub fn fit(family: Family, pla: &Pla, opts: &Options) -> Result<FitResult, FitEr
 /// Distinct UIM inputs a block can route to its product terms (all families).
 pub const UIM_INPUTS_PER_BLOCK: usize = 40;
 
-/// Product terms one cell can use: its own 5 and those of up to 15 cascade helpers in its block.
-pub const MAX_CHAIN_PTS: usize = 16 * 5;
-
-/// Intermediate cubes spent on a complement that only decides between the two polarities.
-const COMPLEMENT_CHOICE_CUBES: usize = 1 << 14;
+pub use crate::capacity::MAX_CHAIN_PTS;
+use crate::capacity::{helper_slot, helpers_for, pt_demand, COMPLEMENT_CHOICE_CUBES, MAX_CHAIN_MCS, PTS_PER_MC};
 
 /// Cells whose product terms would need more signals than a block's UIM delivers can never fit:
 /// report them instead of trying (and instead of complementing huge functions).
@@ -677,8 +674,9 @@ fn place_cells(
     }
     // product-term demand per cell (estimate), and cascade helper reservations below pinned cells
     let demand: Vec<usize> = design.cells.iter().map(|c| pt_demand(c, design.xor.get(&c.name))).collect();
-    // a cell borrows cascade helpers only within its block (at most 15 neighbours, 5 PTs each):
-    // placement uses the same estimate, so a larger demand can never be placed (spec F4.3)
+    // a cell borrows cascade helpers only within its block, at most a chain of MAX_CHAIN_MCS
+    // (crate::capacity): placement uses the same estimate, so a larger demand can never be
+    // placed (spec F4.3)
     if let Some((i, &n)) = demand.iter().enumerate().max_by_key(|(_, &n)| n).filter(|(_, &n)| n > MAX_CHAIN_PTS) {
         return err(
             FitErrorKind::Capacity,
@@ -687,12 +685,10 @@ fn place_cells(
     }
     let mut reserved_mcs: BTreeSet<u16> = BTreeSet::new();
     for (i, c) in design.cells.iter().enumerate() {
-        if demand[i] > 5 {
-            if let Some(&Place::Pin { mc, .. } | &Place::Node { mc }) = place_of.get(&c.name) {
-                for k in 1..=((demand[i] - 1) / 5) as u16 {
-                    if mc > k && (mc - k - 1) / 16 == (mc - 1) / 16 {
-                        reserved_mcs.insert(mc - k);
-                    }
+        if let Some(&Place::Pin { mc, .. } | &Place::Node { mc }) = place_of.get(&c.name) {
+            for k in 1..=helpers_for(demand[i]) as u16 {
+                if mc > k && (mc - k - 1) / 16 == (mc - 1) / 16 {
+                    reserved_mcs.insert(mc - k);
                 }
             }
         }
@@ -770,7 +766,7 @@ fn place_cells(
     // logic doubling: pair buried registers with combinatorial outputs when macrocells run short
     let mut host_of: BTreeMap<usize, usize> = BTreeMap::new(); // register cell -> host output cell
     {
-        let helpers: usize = demand.iter().map(|&d| if d > 5 { (d - 1) / 5 } else { 0 }).sum();
+        let helpers: usize = demand.iter().map(|&d| helpers_for(d)).sum();
         let mut need = (design.cells.len() + helpers + extra_pairs).saturating_sub(nmc);
         if opts.logic_doubling && need > 0 {
             need = usize::MAX; // dense design with doubling allowed: pair every eligible register
@@ -808,7 +804,7 @@ fn place_cells(
                     !hosts_used.contains(yi)
                         && y.is_output
                         && y.storage == Storage::Comb
-                        && demand[*yi] + extra <= 5
+                        && demand[*yi] + extra <= PTS_PER_MC
                         && (y.oe.is_none() || !design.cells.iter().any(|o| o.inputs().contains(&Signal::Fb(y.name.clone(), false))))
                         && place_of.contains_key(&y.name)
                         && fanin_ok(design, &place_of, (mc_of(&place_of, &y.name) - 1) / 16, r, fanin_limit)
@@ -836,7 +832,7 @@ fn place_cells(
         }
         if std::env::var_os("ATF_FIT_DEBUG").is_some() {
             for (i, c) in design.cells.iter().enumerate() {
-                if demand[i] > 5 {
+                if demand[i] > PTS_PER_MC {
                     eprintln!("fit: {} needs {} PTs ({} products)", c.name, demand[i], c.data.0.len());
                 }
             }
@@ -1037,7 +1033,7 @@ fn place_cells(
                 matches!(place_of.get(&c.name), Some(Place::Node { .. }))
                     && !host_of.contains_key(i)
                     && !fast_in.contains(&c.name)
-                    && demand[*i] <= 5
+                    && demand[*i] <= PTS_PER_MC
                     && c.node.map_or(true, |n| n == 0)
             })
             .map(|(_, c)| c.name.clone())
@@ -1300,7 +1296,7 @@ fn plan_pts(dev: &'static Device, design: &Design, opts: &Options, placed: &mut 
                 pl.in_sum.insert(free[i]);
             } else {
                 let k = i - free.len() + 1;
-                if k > 5 || !opts.cascade {
+                if k > (MAX_CHAIN_MCS - 1) * PTS_PER_MC || !opts.cascade {
                     return err(FitErrorKind::Capacity, format!("{}: {} product terms do not fit", c.name, n));
                 }
                 pl.helper_pts.insert(k, p);
@@ -1355,10 +1351,19 @@ fn plan_pts(dev: &'static Device, design: &Design, opts: &Options, placed: &mut 
         let mc = mc_of(place_of, &c.name);
         // a PT-free input register (D from the pad) leaves its macrocell's PTs and sum free
         let shareable = |j: usize| plans[j].fast_in && plans[j].pts.is_empty() && !plans[j].fold_host;
-        if (mc - 1) % 16 == 0 || uses[mc as usize - 1].cell.map_or(false, |j| !shareable(j)) || uses[mc as usize - 1].helper_for.is_some() {
-            return err(FitErrorKind::Cascade, format!("{}: needs cascade from MC{} which is not free", c.name, mc - 1));
+        // the chain MC-1, MC-2, ... (crate::capacity), all in the cell's block
+        let n_helpers = helper_slot(*plans[i].helper_pts.keys().max().expect("helper PTs")).0 as u16;
+        for h in 1..=n_helpers {
+            let m = mc.wrapping_sub(h);
+            if mc <= h
+                || (m - 1) / 16 != (mc - 1) / 16
+                || uses[m as usize].cell.map_or(false, |j| !shareable(j))
+                || uses[m as usize].helper_for.is_some()
+            {
+                return err(FitErrorKind::Cascade, format!("{}: needs cascade from MC{} which is not free", c.name, m));
+            }
+            uses[m as usize].helper_for = Some(mc);
         }
-        uses[mc as usize - 1].helper_for = Some(mc);
     }
 
     Ok(plans)
@@ -1496,8 +1501,8 @@ fn route_uim(dev: &'static Device, design: &Design, placed: &Placed, plans: &[Pt
             if let Some(plan) = plan {
                 if u.cell.is_some() {
                     prods.extend(plan.pts.values());
-                } else {
-                    prods.extend(plan.helper_pts.values());
+                } else if let Some(t) = u.helper_for {
+                    prods.extend(helper_pts_at(plan, t, m as u16).map(|(_, p)| p));
                 }
             }
             for p in prods {
@@ -1519,7 +1524,7 @@ fn route_uim(dev: &'static Device, design: &Design, placed: &Placed, plans: &[Pt
             let u = &uses[m];
             let (Some(_), Some(t)) = (u.cell, u.helper_for) else { continue };
             let Some(i) = uses[t as usize].cell else { continue };
-            for p in plans[i].helper_pts.values() {
+            for (_, p) in helper_pts_at(&plans[i], t, m as u16) {
                 for (s, _) in p {
                     if matches!(s, Signal::Fold(_)) {
                         continue;
@@ -1709,7 +1714,7 @@ fn assemble(
                 for k in 1..=5 {
                     set(pt_mux_bit(k), false);
                 }
-                for (&k, p) in &plans[uses[t as usize].cell.unwrap()].helper_pts {
+                for (k, p) in helper_pts_at(&plans[uses[t as usize].cell.unwrap()], t, m as u16) {
                     write_pt(&mut fz, f, m, k, p, b_of(m), &col_of, fold_mc, &source_of)?;
                 }
             }
@@ -1751,7 +1756,7 @@ fn assemble(
             for k in 1..=5 {
                 set(pt_mux_bit(k), false);
             }
-            for (&k, p) in &pl.helper_pts {
+            for (k, p) in helper_pts_at(pl, t, m as u16) {
                 write_pt(&mut fz, f, m, k, p, b_of(m), &col_of, fold_mc, &source_of)?;
             }
         } else if let Some(p) = fold_at.get(&(m as u16)) {
@@ -1773,69 +1778,6 @@ fn assemble(
         placement.push((name.clone(), pl.clone()));
     }
     Ok(FitResult { device: dev, fuses: fz, placement, routing, design })
-}
-
-/// Products left after foldback factoring of `target` down to 3 (see [`factor_with_foldback`]),
-/// memoised per thread: every fit attempt of every strategy asks again for the same covers. The
-/// factoring also registers its foldbacks in FOLDS, which planning resets before it factors for
-/// real, so a cached answer loses nothing.
-fn factored_len(target: &Sop) -> usize {
-    thread_local! {
-        static FACTORED: std::cell::RefCell<rustc_hash::FxHashMap<Sop, usize>> = Default::default();
-    }
-    if let Some(n) = FACTORED.with(|m| m.borrow().get(target).copied()) {
-        return n;
-    }
-    let mut s = target.0.clone();
-    while s.len() > 3 {
-        match factor_with_foldback(&s) {
-            Some(x) => s = x,
-            None => break,
-        }
-    }
-    FACTORED.with(|m| {
-        let mut m = m.borrow_mut();
-        if m.len() > 1 << 14 {
-            m.clear();
-        }
-        m.insert(target.clone(), s.len());
-    });
-    s.len()
-}
-
-/// Estimated product terms a cell needs in its macrocell (sum + special functions).
-fn pt_demand(c: &Cell, xor: Option<&XorSplit>) -> usize {
-    let target = if c.active_low { c.data.complement() } else { c.data.clone() };
-    let mut n = target.0.len();
-    if let Some(x) = xor {
-        n = n.min(1 + if c.active_low { x.gbar.0.len() } else { x.g.0.len() });
-    }
-    if n > 1 {
-        // the other polarity as an alternative cost; one too large to compute is no alternative
-        let alt =
-            if c.active_low { c.data.0.len() } else { c.data.complement_within(COMPLEMENT_CHOICE_CUBES).map_or(usize::MAX, |x| x.0.len()) };
-        n = n.min(alt.max(1));
-    }
-    if n > 3 {
-        n = n.min(factored_len(&target));
-    }
-    let single_pad = |s: &Option<Sop>| s.as_ref().map_or(false, |x| matches!(x.single_literal(), Some((Signal::Pad(_), _))));
-    if c.clk.is_some() && !single_pad(&c.clk) {
-        n += 1;
-    }
-    if c.ce.is_some() {
-        n += 1;
-    }
-    if c.ar.is_some() && !single_pad(&c.ar) {
-        n += 1;
-    }
-    if c.ap.is_some() {
-        n += 1;
-    }
-    if c.oe.as_ref().map_or(false, |x| x.single_literal().is_none() && !x.is_one()) {
-        n += 1;
-    }
-    n
 }
 
 /// Assign the floating buried cells (not outputs, not yet placed) to blocks so that every block's
@@ -1917,7 +1859,7 @@ fn partition_blocks(
         }
     }
     // macrocells that are placed (by pin) but carry no cell are still free for buried logic
-    let size = |i: usize| 1 + if demand[i] > 5 { ((demand[i] - 1) / 5) as i64 } else { 0 };
+    let size = |i: usize| 1 + helpers_for(demand[i]) as i64;
     // cell index -> block (NONE: not placed by the partitioner)
     const NONE: usize = usize::MAX;
     let mut blk: Vec<usize> = vec![NONE; design.cells.len()];
@@ -2213,11 +2155,15 @@ fn pack_input_registers(
 /// Can the cascade helpers of a cell with `demand` PTs placed at `mc` go below it? `share`: MCs
 /// whose only occupant is a PT-free input register (D from the pad): their whole PT array and
 /// sum are free, so they can lend their sum (spec F4.6a, packing P2+).
+/// The product terms of `plan` (the cell in macrocell `target`) that helper macrocell `m` holds,
+/// with their PT slot in `m` (crate::capacity::helper_slot).
+fn helper_pts_at(plan: &PtPlan, target: u16, m: u16) -> impl Iterator<Item = (usize, &Vec<(Signal, bool)>)> {
+    let h = (target - m) as usize;
+    plan.helper_pts.iter().filter(move |(&k, _)| helper_slot(k).0 == h).map(|(&k, p)| (helper_slot(k).1, p))
+}
+
 fn helpers_free(mc: u16, demand: usize, place_of: &BTreeMap<String, Place>, reserved: &BTreeSet<u16>, share: &BTreeSet<u16>) -> bool {
-    if demand <= 5 {
-        return true;
-    }
-    let k = ((demand - 1) / 5) as u16;
+    let k = helpers_for(demand) as u16;
     (1..=k).all(|j| {
         mc > j
             && (mc - j - 1) / 16 == (mc - 1) / 16
@@ -2236,10 +2182,8 @@ fn pt_free_input_register(c: &Cell) -> bool {
 }
 
 fn reserve_helpers(mc: u16, demand: usize, reserved: &mut BTreeSet<u16>) {
-    if demand > 5 {
-        for j in 1..=((demand - 1) / 5) as u16 {
-            reserved.insert(mc - j);
-        }
+    for j in 1..=helpers_for(demand) as u16 {
+        reserved.insert(mc - j);
     }
 }
 
@@ -2364,7 +2308,7 @@ thread_local! {
 
 /// One factoring step: find the literal shared by the most products whose remainders are single
 /// literals; replace those products by `literal & FOLD(product of the negated remainders)`.
-fn factor_with_foldback(sum: &[Vec<(Signal, bool)>]) -> Option<Vec<Vec<(Signal, bool)>>> {
+pub(crate) fn factor_with_foldback(sum: &[Vec<(Signal, bool)>]) -> Option<Vec<Vec<(Signal, bool)>>> {
     // De Morgan factoring with the block's foldback NAND terms: products that share a common
     // cube C and differ in one further literal each, `C&r1 # C&r2 # ... # C&rk`, are
     // `C & (r1 + ... + rk)` = `C & !(!r1 & ... & !rk)`: one foldback PT (the NAND) replaces k

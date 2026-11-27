@@ -60,7 +60,7 @@ struct Common {
     /// Output directory
     #[arg(short, long, default_value = "out")]
     output: PathBuf,
-    /// Product terms per cell (macrocell + one cascade neighbour) when inlining or splitting logic
+    /// Product terms per cell (its macrocell and cascade helpers, at most 30) when inlining or splitting logic
     #[arg(long, default_value_t = 10)]
     max_products: usize,
     /// Seconds after which no further fitting strategy is started
@@ -123,6 +123,10 @@ fn options(c: &Common) -> Result<FlowOptions, String> {
             (k.to_string(), v.split(',').map(String::from).collect())
         })
         .collect();
+    let chain = atf15xx_fit::capacity::MAX_CHAIN_PTS;
+    if !(2..=chain).contains(&c.max_products) {
+        return Err(format!("--max-products {}: must be 2 to {chain} (the longest cascade chain)", c.max_products));
+    }
     Ok(FlowOptions {
         part: c.device.clone(),
         top: c.top.clone(),

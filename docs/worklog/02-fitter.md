@@ -107,6 +107,35 @@ Per item; the same markings are used in `docs/architecture/fitter/02-fuse-map.md
 
 ## Journal
 
+* **2026-11-27** (main session) — Cascade chains and one capacity model (user request: make the
+  splitter, placement and the planner agree). The three disagreed: the flow's splitter assumed
+  a macrocell plus one helper (10 terms), placement reserved up to 15 helpers (80 terms), the
+  planner used exactly one helper. New workflow `tools/fuzzers/fitter-cascade` asked the vendor
+  fitter (ATF1504AS, N-term sums, 6–40, comb/reg, floating/pinned, 56 + 4 designs): chains of one
+  helper per further 5 terms, MC−1, MC−2, … downwards, at most 6 macrocells (30 terms); from 31
+  terms no cascade (*oracle-verified*). New `atf15xx-fit/src/capacity.rs` holds that model
+  (`PTS_PER_MC`, `MAX_CHAIN_MCS` = 6, `helpers_for`, `helper_slot`) and the PT estimate
+  `pt_demand` (moved from fit.rs, with `pt_demand_with` for a cover not yet substituted), used by
+  placement, the planner (chains: term k beyond the own free PTs into MC−h, h = ⌈k/5⌉) and the
+  netlist passes (`opt::collapse_limited` counts macrocells with `capacity::mcs_for`). A first
+  attempt that kept opt's own cost (no foldback factoring) counted a 15-product cover as 3
+  macrocells where the fitter needs 2 and made the 20-bit accumulator's speed fit worse (30 MCs
+  at 62.5 MHz → 31 at 10.1 MHz); sharing `pt_demand` restored it. `--max-products` is checked
+  against 2…30. Fixed on the way: `tools/sim/simlib.fit_bin` built the long-gone package
+  `fit1504`, so `check_design.py` silently checked a stale binary; it now builds `atf15xx-fit`
+  and refuses a stale binary unless `SIM_ALLOW_STALE=1`.
+  Results: the 44 chained cascade designs our fitter fits (6–25 terms) are PROVEN equivalent to
+  their `.tt2`, as are the vendor's; not fuse-identical (the vendor places inputs in another order,
+  D0 last: an input-order heuristic we do not model); 30 terms fail our UIM routing. Regression:
+  tests 52/52 (new `tests/cascade.rs`: chain layout and the function in the simulator for 6–25
+  terms, refusal beyond 30), corpus and examples byte-identical, vendor identity 2017 / 4025 /
+  6155 and all 12,624 vendor-design JEDs byte-identical. End-to-end benchmark: the 12-way
+  registered mux on the ATF1508AS now fits (108 MCs, 43.5 MHz; was "12 product terms do not
+  fit"), the 11-way one takes 100 MCs at 43.5 MHz (was 109 at 55.6; area goal; with `--optimize
+  speed` 100 MCs at 55.6 MHz, was 109), both PROVEN against their Verilog; failing designs now
+  name the chain limit; total 399 s (was 355): the 20-bit compare's gate mapping, which fails
+  either way, takes 69 s instead of 23 s, because the wide equality cell now passes planning and
+  reaches the UIM repair loop (max 32 repairs without progress, so a stall rule would not help).
 * **2026-11-26** (main session) — Crate boundary moved (user request: keep synth and fit
   separate, with technology mapping on the fitter's side): `opt.rs` (netlist optimisation) and the
   `.tt2` writer (`tt2out.rs`) moved from `atf15xx-synth` to `atf15xx-fit` (git mv, paths only); the

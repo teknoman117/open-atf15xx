@@ -1,5 +1,6 @@
 //! Netlist optimisations between the Yosys front end and the fitter (spec §F7.4).
 
+use crate::capacity::mcs_for;
 use crate::logic::{Signal, Sop};
 use crate::netlist::{Cell, Design, Storage};
 
@@ -25,8 +26,8 @@ fn cost(s: &Sop) -> usize {
     }
 }
 
-/// Product terms available for a cell's data: `max_products` (macrocell + one cascade neighbour)
-/// minus the PTs its special functions may take (a clock that is a single literal usually goes
+/// Product terms available for a cell's data: `max_products` (the cell's macrocell and its
+/// cascade helpers, at most [`crate::capacity::MAX_CHAIN_PTS`]) minus the PTs its special functions may take (a clock that is a single literal usually goes
 /// to a GCLK, so it is not counted).
 pub fn data_limit(c: &Cell, max_products: usize) -> usize {
     let mut used = [&c.ce, &c.ar, &c.ap, &c.oe].iter().filter(|x| x.as_ref().map_or(false, |f| !f.is_one())).count();
@@ -37,7 +38,7 @@ pub fn data_limit(c: &Cell, max_products: usize) -> usize {
 }
 
 /// Split data covers that exceed [`data_limit`] into buried OR nodes (`<cell>_s<k>`, at most
-/// `limit` products each) so that every cell fits a macrocell plus one cascade neighbour.
+/// `limit` products each) so that every cell fits its macrocell and cascade helpers.
 /// Returns the number of nodes created.
 /// Intermediate cubes [`split_large`] spends on finding out whether the complement is cheaper.
 const SPLIT_COMPLEMENT_CUBES: usize = 1 << 14;
@@ -276,15 +277,6 @@ pub fn collapse_limited(d: &mut Design, max_products: usize, ties: bool) {
 
 /// Macrocells a cell needs for a data cover: one, plus a cascade neighbour when the cover does
 /// not fit the PTs its special functions leave free.
-fn mcs_for(c: &Cell, data: &Sop) -> usize {
-    let cap = data_limit(c, 5).min(5);
-    if cost(data) <= cap {
-        1
-    } else {
-        2
-    }
-}
-
 /// `f` with buried combinatorial nodes substituted recursively, or None if the cover grows beyond
 /// `budget` products (the analysis view used by toggle recovery: Yosys/ABC leave the register's
 /// own Q hidden inside multi-level logic).

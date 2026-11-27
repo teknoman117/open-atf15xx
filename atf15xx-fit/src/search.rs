@@ -42,7 +42,7 @@ pub enum Goal {
 /// What the search is asked for, besides the fitter options.
 #[derive(Clone, Debug)]
 pub struct SearchOptions {
-    /// Product terms per cell (macrocell + one cascade neighbour) for inlining and splitting.
+    /// Product terms per cell (its macrocell and cascade helpers) for inlining and splitting.
     pub max_products: usize,
     /// `max_products` was given explicitly (fewer strategies are tried).
     pub max_products_given: bool,
@@ -171,7 +171,7 @@ pub fn judge(
 /// One fitting strategy of the flow (spec F7.4, F9.9).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct Strategy {
-    /// Product terms per cell (macrocell + one cascade neighbour) for inlining and splitting.
+    /// Product terms per cell (its macrocell and cascade helpers) for inlining and splitting.
     mp: usize,
     /// Inline nodes when the macrocell balance is a tie.
     ties: bool,
@@ -535,6 +535,10 @@ pub fn search(dev: &'static Device, d: Design, opts: &Options, so: &SearchOption
         match fit {
             Ok(r) => {
                 let used = macrocells_used(&r);
+                if std::env::var_os("ATF15XX_FLOW_DEBUG").is_some() {
+                    let f = timing_of(&r, &so.grade)?.fmax_mhz.unwrap_or(f64::INFINITY);
+                    eprintln!("strategy {si}: fits, {used} macrocells, fmax {f:.1} MHz ({st:?})");
+                }
                 let desc = format!(
                     "strategy {si} (ties {ties}, enables {enables}, spread {spread}, seed {seed}{}{}{}): {}",
                     if toggles { "" } else { ", no toggles" },

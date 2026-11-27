@@ -5,6 +5,7 @@
 //! (the netlist passes of [`opt`] in several strategies, the best fit kept against timing
 //! targets) → [`fit::fit_design`] (placement, global nets, product-term allocation, UIM routing,
 //! fuse assembly) → [`jed::write`]; [`tt2out`] renders a netlist as `.tt2` for the vendor fitter.
+pub mod capacity;
 pub mod cli;
 pub mod fit;
 pub mod jed;

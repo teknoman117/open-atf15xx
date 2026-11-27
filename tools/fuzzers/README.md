@@ -20,12 +20,13 @@ how, the commands, the last results) and a `CLAUDE.md` (the rules for an agent s
 | 5 | [`fitter-pterms`](fitter-pterms/) | fitter | PT column ↔ UIM mux and polarity | evidence for the fuse map (spec F2.3–F2.4) |
 | 6 | [`fitter-macrocell`](fitter-macrocell/) | fitter | macrocell / global option bits, vendor field names | evidence (F2.5–F2.8), `atf15xx-fit/tests/vectors/` |
 | 7 | [`fitter-foldback`](fitter-foldback/) | fitter | foldback column, cascade direction | evidence (F2.6) |
+| 7a | [`fitter-cascade`](fitter-cascade/) | fitter | cascade chains: one helper per further 5 product terms, MC−1, MC−2, … downwards, at most 6 macrocells (30 terms) | the capacity model (spec F4.3, `atf15xx-fit/src/capacity.rs`) |
 | 8 | [`prjbureau`](prjbureau/) | fitter, via prjbureau's fuzzers | prjbureau's fuse database incl. the new ATF1508AS entry | the fuse map and boundary-scan parts `atf15xx-arch` generates at build time from the pinned submodule |
 | 9 | [`fitter-timing`](fitter-timing/) | fitter (SDF output) + datasheets | speed-grade timing tables, delay composition | `atf15xx-arch/data/timing.json` (spec F8) |
 | 10 | [`fitter-conformance`](fitter-conformance/) | fitter | how closely our fitter reproduces the vendor's | regression numbers |
 
 Step 3 uses the database of step 8 (the submodule's committed `database.json` is enough; step 8
-regenerates it). Steps 1–3 need ATMISP, steps 4–7 and 10 the fitters in the host wine prefix, and steps 8 and 9
+regenerates it). Steps 1–3 need ATMISP, steps 4–7a and 10 the fitters in the host wine prefix, and steps 8 and 9
 the `open-atf150x-prjbureau` container. Results go to `.scratch/` (git-ignored); each README
 lists what is committed. The architecture database is rebuilt from these results by cargo:
 

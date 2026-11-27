@@ -167,9 +167,14 @@ the CLI (F9.7), the typed netlist IR (F9.7 item 1), typed fit errors (F9.9), pro
    relative paths.
 5. **Crate hygiene** (plan §5): `jedec` crate for reading (verified identical on 134 JEDs),
    `bitvec`, `thiserror`, an `svf` parser in tests.
-6. **XOR extension**: use a cascade lender's own PT2 output (`x = PT2 ⊕ Invert`, F2.8) as a
+6. **Cascade follow-ups** (F4.3, `tools/fuzzers/fitter-cascade`): the vendor's input placement
+   order (it places the data inputs of the cascade designs as D1…D5, D0), so that chained designs
+   become fuse-identical; 30-term sums fail our UIM routing where the vendor fits; wide cells that
+   reach the UIM repair loop cost time on designs that fail anyway (20-bit compare, gate mapping:
+   69 s).
+7. **XOR extension**: use a cascade lender's own PT2 output (`x = PT2 ⊕ Invert`, F2.8) as a
    packing gain.
-7. **Coarse-level mapping** through the plugin (F9.3 B + C).
+8. **Coarse-level mapping** through the plugin (F9.3 B + C).
 8. Upstream: prjbureau contributions (1508 database, BE programming, silicon facts), OpenOCD
    `atf15xx` PLD driver — each only with the user's go-ahead.
 9. Silicon still to do: cold power-up, slow vs fast slew, 1502AS GOE invert bits.
