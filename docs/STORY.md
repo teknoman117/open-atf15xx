@@ -802,3 +802,13 @@ took 14 seconds to build from Verilog in the morning, takes 3. Along the way the
 remains is the fitter's routing repair loop, which refits a whole attempt each time a block's
 inputs cannot be matched; the partitioning literature (pin-constrained FM, replication) points at
 checking that matching inside the partitioner instead.
+
+The partitioning literature's two remedies were then tried against data, and neither helped: a
+matching-aware partitioner changed nothing in 150 hard fits, and copying nodes between blocks could
+have rescued 3 % of the failures. The failures were cells that read too many signals. A wide
+comparison written as one formula reads three signals per bit, so a 16-bit `<` asks one block for
+48 of its 40 inputs. Built instead from 3- or 4-bit pieces, each piece small and the pieces
+combined in one more cell, the same comparisons fit: 20 bits on the ATF1504AS where 18 had been
+the limit, 36 on the ATF1508AS where 30 had been, and every size that already fitted got smaller,
+178 macrocells over 17 builds. Neither piece shape won everywhere, so the flow builds both and
+keeps the better.
