@@ -830,3 +830,18 @@ steered an accumulator from 62.5 MHz to 10. Using the fitter's own estimate ever
 which was the point of having one model in the first place. On the way, the equivalence harness
 turned out to have been checking a stale fitter binary since the crates were renamed, and now
 refuses to.
+
+Then the vendor was asked how it arranges a chain, because none of the 12,624 designs it had
+fitted for us contained one: our layout had never been compared. It fills the chain from the
+bottom (products 1, 2, …, n−1 into the deepest helper first, product 0 last, in the cell
+itself), configures each helper as a register whose output select depends on whether its pin is
+an input, and places the inputs in the order it will read them. With those three facts the
+cascade designs went from none to 36 of 44 fuse-identical, and every other result stayed byte for
+byte the same. On the way the fitter's 2,800-line file became one module per pass, the hidden
+thread-local table that carried foldback products from one pass to the next became an ordinary
+argument, and the hand-written JEDEC and SVF readers gave way to the `jedec` and `svf` crates,
+each checked against the code it replaced on every file we had. The SVF reader found nothing
+wrong with our output except the four places where we copy ATMISP's own mistakes on purpose, and
+the JTAG safety check, ported onto it, agreed with the Python original on all 227 files it was
+shown.
+
